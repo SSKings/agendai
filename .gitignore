@@ -1,0 +1,31 @@
+# Segredos — nunca no repositório
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+deploy/certs/
+
+# Build e dependências
+target/
+node_modules/
+dist/
+coverage/
+*.log
+
+# IDE / sistema
+.idea/
+.vscode/
+*.iml
+.DS_Store
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+
+# Claude Code: configurações locais (os agentes em .claude/agents/ são versionados)
+.claude/settings.local.json

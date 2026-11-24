@@ -29,3 +29,6 @@ coverage/
 
 # Claude Code: configurações locais (os agentes em .claude/agents/ são versionados)
 .claude/settings.local.json
+
+# Python
+__pycache__/

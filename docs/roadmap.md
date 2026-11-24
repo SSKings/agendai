@@ -5,7 +5,7 @@ desempenho da fase medidas. Nenhuma fase começa antes de a anterior estar merge
 
 | Fase | Conteúdo | Situação |
 |---|---|---|
-| 0 — Fundação | Base do projeto e rede de proteção no CI | próxima |
+| 0 — Fundação | Base do projeto e rede de proteção no CI | em revisão |
 | 1 — Agenda | Serviços, profissionais, expediente, horários livres, agendamento sem conflito | |
 | 2 — Agendamento público | Link público, reserva temporária, confirmação por código, cancelar/remarcar | |
 | 3 — Eventos e notificações | Outbox, RabbitMQ, worker, lembretes | |
@@ -26,7 +26,8 @@ desempenho da fase medidas. Nenhuma fase começa antes de a anterior estar merge
 
 **Entrega:** repositório pronto para o desenvolvimento com toda a rede de proteção, antes de qualquer funcionalidade.
 
-- Backend Spring Boot 4 (Java 17), Flyway, Testcontainers com PostgreSQL, Redis e RabbitMQ.
+- Backend Spring Boot 4 (Java 17), Flyway, Testcontainers com PostgreSQL e Redis. O RabbitMQ entra na fase 3, junto
+  com o primeiro evento (outbox): antes disso seria infraestrutura sem uso para manter e escanear.
 - Frontend React + TypeScript + Vite + Tailwind, com Vitest.
 - Login da equipe (cadastro do dono, senha forte, bloqueio progressivo, access + refresh token com rotação).
 - Estabelecimento (tenant) e isolamento em três camadas, inclusive RLS.

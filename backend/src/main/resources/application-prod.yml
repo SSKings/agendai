@@ -1,0 +1,7 @@
+server:
+  forward-headers-strategy: native    # atrás do nginx: IP real do cliente para o limite por IP
+
+logging:
+  structured:
+    format:
+      console: ecs                    # uma linha JSON por evento

@@ -1,0 +1,80 @@
+# Agendaí — configuração comum. Perfil padrão: dev (application-dev.yml). Produção: SPRING_PROFILES_ACTIVE=prod,
+# e o ProductionConfigValidator recusa subir com segredo ausente/fraco ou CORS aberto.
+spring:
+  web:
+    error:
+      include-message: never
+      include-stacktrace: never
+  application:
+    name: agendai
+  profiles:
+    default: dev
+  datasource:
+    url: ${DATABASE_URL:}
+    username: ${DATABASE_USERNAME:}
+    password: ${DATABASE_PASSWORD:}
+  jpa:
+    open-in-view: false          # nada de consulta escondida na renderização do JSON
+    hibernate:
+      ddl-auto: validate         # o esquema é só do Flyway
+    properties:
+      hibernate.jdbc.time_zone: UTC
+  flyway:
+    enabled: true
+    # migrações com o DONO das tabelas; a API (spring.datasource.username) só tem DML (docs/seguranca.md)
+    user: ${DATABASE_MIGRATION_USERNAME:}
+    password: ${DATABASE_MIGRATION_PASSWORD:}
+    locations: classpath:db/migration,classpath:db/callback
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      # Redis lento não pode segurar a API: passou disso, o limite por IP é pulado (ADR-007)
+      timeout: 200ms
+      connect-timeout: 500ms
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true   # campo a mais no JSON (ex.: tenantId, role) é recusado, não ignorado
+  mvc:
+    problemdetails:
+      enabled: false
+
+server:
+  port: ${PORT:8080}
+  servlet:
+    session:
+      tracking-modes: []         # API sem sessão no servidor
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: false
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+agendai:
+  jwt:
+    secret: ${JWT_SECRET:}
+    access-minutes: 15           # ADR-005: curto; o front renova pelo refresh
+  refresh:
+    ttl-days: 30
+    secure-cookie: true
+  login:
+    max-failures: 5              # falhas seguidas por conta antes de bloquear
+    lock-minutes: 15             # dobra a cada bloqueio seguido (15, 30, 60…), até 24 h
+  rate-limit:
+    auth-per-minute: ${AUTH_RATE_LIMIT_PER_MINUTE:20}   # por IP, no Redis (vale entre instâncias)
+  max-request-bytes: 65536       # a API só recebe JSON pequeno
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:}

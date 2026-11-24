@@ -1,0 +1,3 @@
+# Exceções do scan de imagens (CI). Toda exceção precisa de justificativa e validade (expired_at): vencida, o CI volta
+# a barrar. Hoje não há nenhuma.
+vulnerabilities: []

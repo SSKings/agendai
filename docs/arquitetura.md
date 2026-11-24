@@ -32,7 +32,8 @@
 
 | Módulo | Responsabilidade |
 |---|---|
-| `tenant` | Estabelecimento, equipe, convites, papéis (DONO, PROFISSIONAL) |
+| `user` | Identidade da equipe (conta, senha, versão dos tokens); `/api/me` |
+| `tenant` | Estabelecimento, equipe, convites, papéis (`OWNER` dono, `PROFESSIONAL` profissional) |
 | `catalog` | Serviços e quem faz cada um |
 | `schedule` | Expediente, bloqueios, cálculo de horários livres |
 | `booking` | Agendamentos (criar, cancelar, remarcar, atendido, falta), reservas temporárias |
@@ -40,12 +41,18 @@
 | `waitlist` | Lista de espera e oferta de vaga |
 | `notification` | Outbox e publicação de eventos (o envio fica no worker) |
 | `auth`, `security` | Login da equipe, tokens, limites, cabeçalhos |
+| `db`, `config`, `common` | Infraestrutura: variáveis do RLS na transação, configuração e validação de produção, erros padronizados |
 | `reporting` | Indicadores do painel |
 
 As fronteiras são verificadas por teste (ArchUnit): um módulo só usa a API pública de outro, nunca o repositório dele.
+Exceção registrada: `user` é a identidade, e `auth`/`security`/`config` usam o `UserRepository` (login, filtro do
+token). A partir da fase 1 a regra fica mais estrita (pendências da revisão da fase 0, abaixo).
 
 ## Modelo de dados (núcleo)
 
+- `users` (conta da equipe, global: a mesma pessoa pode estar em vários estabelecimentos) e `refresh_tokens`
+  (só o hash, família, uso e revogação — ADR-005). Sem `tenant_id` nem RLS por natureza; nunca saem pela API a não
+  ser para o próprio usuário.
 - `tenants`, `memberships` (usuário × estabelecimento × papel), `professionals`, `services`, `professional_services`.
 - `working_hours` (por profissional e dia da semana), `time_off` (bloqueios).
 - `bookings`: `tenant_id`, `professional_id`, `service_id`, `customer_id`, `period tstzrange`, `status`.
@@ -99,6 +106,16 @@ certa — sem `@Scheduled` que rodaria em todas as instâncias ao mesmo tempo.
   casos críticos).
 - Leitura mais frequente (horários livres da página pública) com cache curto no Redis, invalidado pelos eventos de
   agendamento e de expediente.
+- Redis com timeout curto (200 ms): lento ou fora, o limite por IP é pulado (com aviso no log), nunca trava a API.
+
+### Pendências registradas na revisão da fase 0 (para a fase 1)
+
+- Login: o BCrypt roda dentro da transação com a linha do usuário travada; mover a verificação para fora e gravar as
+  falhas num `UPDATE` atômico, e dimensionar o pool do Hikari com teste de carga.
+- `refresh_tokens`: job de limpeza dos vencidos (com trava distribuída) e índice parcial dos ativos.
+- Fronteiras: principal próprio (DTO) em vez da entidade `User` no contexto de segurança; regra ArchUnit sem ciclos
+  entre pacotes (`user` ↔ `tenant`, `user` ↔ `security`).
+- Métrica (Micrometer) para "Redis indisponível", além do log.
 
 ## Desempenho: metas (SLOs)
 

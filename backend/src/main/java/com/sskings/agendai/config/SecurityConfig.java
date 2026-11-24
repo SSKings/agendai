@@ -50,6 +50,8 @@ public class SecurityConfig {
                             @Value("${springdoc.swagger-ui.enabled:false}") boolean docs) throws Exception {
         PathPatternRequestMatcher.Builder path = PathPatternRequestMatcher.withDefaults();
         return http
+                // Sem CSRF do Spring: a API autentica por Authorization (o navegador não manda sozinho); a única rota com
+                // cookie (refresh) exige SameSite=Strict + X-Requested-With (docs/seguranca.md, linha CSRF)
                 .csrf(c -> c.disable())
                 .cors(Customizer.withDefaults())             // bean "corsConfigurationSource" abaixo
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

@@ -44,6 +44,8 @@ interface ProfessionalServiceRepository extends JpaRepository<ProfessionalServic
 
     List<ProfessionalService> findByTenantId(UUID tenantId);
 
+    boolean existsByTenantIdAndId(UUID tenantId, ProfessionalService.Link id);
+
     List<ProfessionalService> findByTenantIdAndIdProfessionalId(UUID tenantId, UUID professionalId);
 
     @Modifying

@@ -23,7 +23,12 @@ hora que deixam a cadeira vazia.
 - **Profissionais:** quem faz quais serviços; convite por link de uso único para entrar na equipe.
 - Limites por estabelecimento: até 100 serviços e 50 profissionais (cobre com folga o público-alvo; evita listas sem
   limite).
-- **Expediente:** horários por dia da semana e por profissional; feriados e bloqueios pontuais.
+- **Expediente:** horários por dia da semana e por profissional (mais de uma faixa no dia = pausa, ex.: almoço; até
+  28 faixas na semana); feriados (o estabelecimento inteiro) e bloqueios pontuais de um profissional, de até 92 dias
+  cada e até 200 ainda por acontecer.
+- **Horários livres:** começam de 15 em 15 minutos a partir do início de cada faixa; atendimento + preparo precisam
+  caber inteiros na faixa e não encostar em bloqueio; hoje, só daqui para frente; consulta de hoje até 180 dias à
+  frente. Serviço ou profissional inativo não tem horário.
 - **Política:** antecedência mínima para agendar, até quantas horas antes o cliente pode cancelar sozinho, quantos
   dias à frente a agenda abre.
 

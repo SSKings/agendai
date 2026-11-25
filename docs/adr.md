@@ -56,3 +56,32 @@ sozinha.
 **Decisão:** reservas (com expiração), limites por IP/estabelecimento e o cache de horários livres ficam no Redis.
 Se o Redis cair, a API continua agendando (a garantia é o banco), sem cache e com limite degradado registrado em alerta.
 **Consequência:** mais um serviço na pilha; comportamento com o Redis fora é testado.
+
+## ADR-008 — Tempo na agenda: expediente em hora local, bloqueios em UTC, horários livres com deslocamento
+
+**Contexto:** o dono pensa em "segunda, das 09:00 às 18:00" no fuso do estabelecimento; o banco guarda instantes; o
+front pode estar em outro fuso; zonas com horário de verão têm dias de 23 e 25 horas e horas repetidas.
+**Decisão:**
+- Expediente é **hora de parede**: dia da semana ISO + minutos desde 00:00 no fuso do estabelecimento (`24:00` = fim
+  do dia), convertido para instantes no dia consultado. Na troca de horário de verão o expediente continua começando às
+  09:00 locais.
+- Bloqueios são **instantes** (`timestamptz`), mas a API recebe e devolve a data-hora **local, sem deslocamento**
+  (`2026-12-25T00:00`, formato `local-date-time` no contrato): quem cadastra pensa no relógio da loja, não no do
+  navegador. Valor com deslocamento ou `Z` é recusado (400), nunca reinterpretado.
+- Horários livres saem como `OffsetDateTime` (`2026-11-30T09:15:00-03:00`): sem ambiguidade na hora repetida.
+- Horários começam de 15 em 15 min a partir do início de cada faixa (grade da página pública); expediente, bloqueios e
+  durações andam de 5 em 5. O agendamento manual do painel (1c) poderá usar qualquer início de 5 em 5 que caiba.
+- A duração máxima de um bloqueio (92 dias) é em tempo real: atravessando o fim do horário de verão, 92 dias de
+  calendário têm 1 hora a mais e são recusados.
+- 180 dias é o teto técnico da consulta; a política do estabelecimento ("quantos dias à frente a agenda abre") ficará
+  sempre abaixo dele.
+- `working_hours` não tem restrição de exclusão: a semana é trocada inteira, validada na aplicação sob a trava de
+  escrita do estabelecimento (`DbSession.lockTenant`), e o banco garante o resto com CHECKs. A restrição de exclusão
+  dos agendamentos (ADR-002) precisa da extensão `btree_gist`, que o dono das tabelas não pode criar (só tem
+  `CONNECT, TEMPORARY`): na 1c ela entra pelo superusuário, em `deploy/db-init` **e** em `test-roles.sql` (CI e
+  produção iguais), com o passo documentado para banco já existente.
+- Dependência entre módulos: `booking` (1c) usa `schedule` (expediente e bloqueios) — nunca o contrário. Para os
+  horários livres considerarem agendamentos, `schedule` define uma porta ("períodos ocupados") que `booking`
+  implementa.
+**Consequência:** a conversão local ↔ UTC fica num lugar só (`ScheduleService`), coberta por testes de virada do dia
+UTC × local e de horário de verão; a 1c herda o formato sem decidir de novo.

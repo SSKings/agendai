@@ -3,12 +3,15 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider, useAuth, type Status } from './auth/AuthContext'
 import { Layout } from './components/Layout'
 import { AccountPage } from './pages/AccountPage'
+import { AvailabilityPage } from './pages/AvailabilityPage'
 import { HomePage } from './pages/HomePage'
+import { HoursPage } from './pages/HoursPage'
 import { LoginPage } from './pages/LoginPage'
 import { RegisterPage } from './pages/RegisterPage'
 import { ServicesPage } from './pages/ServicesPage'
 import { TeamPage } from './pages/TeamPage'
 import { TenantLayout } from './pages/TenantLayout'
+import { TimeOffPage } from './pages/TimeOffPage'
 
 /** Libera a rota só no estado pedido: área logada exige sessão; entrar/cadastro só sem sessão. */
 function Gate({ need, children }: { need: Exclude<Status, 'loading'>; children: ReactNode }) {
@@ -31,6 +34,9 @@ export function App() {
             <Route index element={<Navigate to="servicos" replace />} />
             <Route path="servicos" element={<ServicesPage />} />
             <Route path="equipe" element={<TeamPage />} />
+            <Route path="expediente" element={<HoursPage />} />
+            <Route path="bloqueios" element={<TimeOffPage />} />
+            <Route path="horarios" element={<AvailabilityPage />} />
           </Route>
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

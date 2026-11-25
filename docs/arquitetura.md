@@ -35,7 +35,7 @@
 | `user` | Identidade da equipe (conta, senha, versão dos tokens); `/api/me` |
 | `tenant` | Estabelecimento, equipe, convites, papéis (`OWNER` dono, `PROFESSIONAL` profissional) |
 | `catalog` | Serviços (duração, intervalo, preço em centavos) e profissionais com os serviços que cada um faz; até 100 serviços e 50 profissionais por estabelecimento (listas sempre limitadas) |
-| `schedule` | Expediente, bloqueios, cálculo de horários livres |
+| `schedule` | Expediente semanal por profissional (até 28 faixas), bloqueios e feriados (até 200 futuros por estabelecimento), cálculo de horários livres; usa o catálogo e o estabelecimento só pela API pública deles (`CatalogService.requireProfessional`/`offer`, `TenantService.zoneOf`) |
 | `booking` | Agendamentos (criar, cancelar, remarcar, atendido, falta), reservas temporárias |
 | `publicbooking` | Rotas públicas do cliente (sem login), verificação por código, links pessoais |
 | `waitlist` | Lista de espera e oferta de vaga |
@@ -44,7 +44,9 @@
 | `db`, `config`, `common` | Infraestrutura: variáveis do RLS na transação, configuração e validação de produção, erros padronizados |
 | `reporting` | Indicadores do painel |
 
-As fronteiras são verificadas por teste (ArchUnit): um módulo só usa a API pública de outro, nunca o repositório dele.
+Métodos que um módulo oferece a outro (ex.: `CatalogService.offer`) usam `Propagation.MANDATORY` e não repetem o
+guard: só valem dentro de uma transação que já passou por `TenantAccess` (sem ela, o RLS esconde tudo e a resposta é
+404). As fronteiras são verificadas por teste (ArchUnit): um módulo só usa a API pública de outro, nunca o repositório dele.
 Exceção registrada: `user` é a identidade, e `auth`/`security`/`config` usam o `UserRepository` (login, filtro do
 token). A partir da fase 1 a regra fica mais estrita (pendências da revisão da fase 0, abaixo).
 
@@ -54,7 +56,8 @@ token). A partir da fase 1 a regra fica mais estrita (pendências da revisão da
   (só o hash, família, uso e revogação — ADR-005). Sem `tenant_id` nem RLS por natureza; nunca saem pela API a não
   ser para o próprio usuário.
 - `tenants`, `memberships` (usuário × estabelecimento × papel), `professionals`, `services`, `professional_services`.
-- `working_hours` (por profissional e dia da semana), `time_off` (bloqueios).
+- `working_hours` (por profissional e dia da semana, em minutos do dia no fuso local; a API troca a semana inteira
+  de uma vez) e `time_off` (bloqueios em UTC; sem profissional = o estabelecimento inteiro).
 - `bookings`: `tenant_id`, `professional_id`, `service_id`, `customer_id`, `period tstzrange`, `status`.
 - `customers` (por estabelecimento: nome, e-mail, telefone — o mínimo, ver LGPD em seguranca.md).
 - `waitlist_entries`, `outbox_events`, `processed_events` (idempotência do worker).
@@ -95,6 +98,10 @@ certa — sem `@Scheduled` que rodaria em todas as instâncias ao mesmo tempo.
 - Tudo guardado em UTC (`timestamptz`); cada estabelecimento tem seu fuso (`America/Sao_Paulo` por padrão).
 - Cálculo de horários livres sempre no fuso do estabelecimento; o "hoje" vem de um `Clock` injetável.
 - Testes rodam com a JVM em UTC e cobrem a virada do dia entre UTC e o fuso local.
+- Expediente é hora de parede ("09:00 às 18:00" no fuso do estabelecimento), convertida para instantes no dia
+  consultado: na troca de horário de verão o expediente continua começando às 09:00 locais. Bloqueios são instantes
+  (a API recebe e devolve a data-hora local). Horários livres saem com o deslocamento (`2026-11-30T09:15:00-03:00`),
+  sem ambiguidade na hora repetida.
 
 ## Escalabilidade
 
@@ -102,11 +109,14 @@ certa — sem `@Scheduled` que rodaria em todas as instâncias ao mesmo tempo.
 - Limite por IP e reservas no **Redis** (compartilhados entre instâncias), não em mapas locais.
 - Jobs com trava no banco (`SKIP LOCKED`) ou no Redis: rodam uma vez, não uma por instância.
 - Nenhuma rota devolve lista sem limite: ou é paginada, ou tem teto fixo por estabelecimento (catálogo: 100 serviços e
-  50 profissionais), garantido com a trava de escrita por estabelecimento (`DbSession.lockTenant`).
+  50 profissionais; agenda: 28 faixas por profissional, 200 bloqueios futuros, listagem de bloqueios por período de
+  até 92 dias), garantido com a trava de escrita por estabelecimento (`DbSession.lockTenant`).
 - Pool de conexões dimensionado e medido; índices definidos junto com cada consulta (e testados com `EXPLAIN` nos
   casos críticos).
 - Leitura mais frequente (horários livres da página pública) com cache curto no Redis, invalidado pelos eventos de
-  agendamento e de expediente.
+  agendamento e de expediente. Pendente para a fase 2: a troca de expediente e a criação/remoção de bloqueio ainda não
+  geram evento (entram pelo outbox junto com o cache), e os horários livres fazem ~9 idas ao banco (catálogo e fuso
+  podem vir numa consulta só).
 - Redis com timeout curto (200 ms): lento ou fora, o limite por IP é pulado (com aviso no log), nunca trava a API.
 
 ### Pendências registradas na revisão da fase 0 (para a fase 1)

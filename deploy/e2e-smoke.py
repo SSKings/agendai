@@ -15,6 +15,8 @@ import sys
 import urllib.error
 import urllib.request
 import uuid
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 BASE = sys.argv[1].rstrip("/") if len(sys.argv) > 1 else "https://localhost:18443"
 CTX = ssl.create_default_context() if "--verify-tls" in sys.argv else ssl._create_unverified_context()
@@ -107,6 +109,23 @@ def main():
     s, _, _ = call("POST", f"/api/tenants/{call('GET', '/api/me', eve['accessToken'])[1]['tenants'][0]['id']}/professionals",
                    eve["accessToken"], {"name": "Intruso", "active": True, "serviceIds": [svc["id"]]})
     check("serviço da Ana não pode ser ligado a profissional da Eve", s == 400, s)
+
+    # ---- agenda (fase 1b): expediente, bloqueio e horários livres, no fuso do estabelecimento ----
+    day = (datetime.now(ZoneInfo(tenant["timeZone"])) + timedelta(days=7)).date()
+    s, _, _ = call("PUT", f"{base}/professionals/{pro['id']}/working-hours", ana["accessToken"],
+                   {"intervals": [{"weekday": day.isoweekday(), "start": "09:00", "end": "11:00"}]})
+    check("dono define o expediente da semana", s == 200, s)
+    s, off, _ = call("POST", base + "/time-off", ana["accessToken"],
+                     {"professionalId": pro["id"], "start": f"{day}T09:00", "end": f"{day}T09:30", "reason": "Médico"})
+    check("dono bloqueia meia hora", s == 201, off)
+    s, av, _ = call("GET", f"{base}/availability?professionalId={pro['id']}&serviceId={svc['id']}&date={day}", ana["accessToken"])
+    check("horários livres: expediente, bloqueio e atendimento + preparo (35 min) na hora local",
+          s == 200 and [x[11:16] for x in av["slots"]] == ["09:30", "09:45", "10:00", "10:15"]
+          and all(x.startswith(f"{day}T") for x in av["slots"]), av)
+    check("bloqueios da Ana: 404 para outro dono", call("GET", f"{base}/time-off?from={day}&to={day}", eve["accessToken"])[0] == 404)
+    eve_base = f"/api/tenants/{call('GET', '/api/me', eve['accessToken'])[1]['tenants'][0]['id']}"
+    s, theirs, _ = call("GET", f"{eve_base}/time-off?from={day}&to={day}", eve["accessToken"])
+    check("bloqueios da Ana não aparecem no estabelecimento da Eve", s == 200 and theirs == [], theirs)
 
     # ---- refresh: anti-CSRF, rotação e reuso ----
     check("refresh sem o cabeçalho anti-CSRF: 403", refresh(cookie, csrf=False)[0] == 403)

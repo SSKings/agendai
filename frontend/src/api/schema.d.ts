@@ -116,6 +116,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/tenants/{tenantId}/availability": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["availability"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/tenants/{tenantId}/professionals": {
         parameters: {
             query?: never;
@@ -141,6 +157,22 @@ export interface paths {
         };
         get?: never;
         put: operations["updateProfessional"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tenants/{tenantId}/professionals/{professionalId}/working-hours": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["workingHours"];
+        put: operations["replaceWorkingHours"];
         post?: never;
         delete?: never;
         options?: never;
@@ -180,6 +212,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/tenants/{tenantId}/time-off": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["timeOff"];
+        put?: never;
+        post: operations["createTimeOff"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tenants/{tenantId}/time-off/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["deleteTimeOff"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -187,6 +251,12 @@ export interface components {
         AuthResponse: {
             accessToken: string;
             user: components["schemas"]["UserView"];
+        };
+        AvailabilityView: {
+            /** Format: date */
+            date: string;
+            slots: string[];
+            timeZone: string;
         };
         ChangePasswordRequest: {
             currentPassword: string;
@@ -253,11 +323,49 @@ export interface components {
             slug: string;
             timeZone: string;
         };
+        TimeOffRequest: {
+            /**
+             * Format: local-date-time
+             * @example 2026-12-26T00:00
+             */
+            end: string;
+            /** Format: uuid */
+            professionalId?: string;
+            reason?: string;
+            /**
+             * Format: local-date-time
+             * @example 2026-12-25T00:00
+             */
+            start: string;
+        };
+        TimeOffView: {
+            /** Format: local-date-time */
+            end: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            professionalId?: string | null;
+            reason?: string | null;
+            /** Format: local-date-time */
+            start: string;
+        };
         UserView: {
             email: string;
             /** Format: uuid */
             id: string;
             name: string;
+        };
+        WorkingHoursRequest: {
+            intervals: components["schemas"]["WorkingInterval"][];
+        };
+        WorkingHoursView: {
+            intervals: components["schemas"]["WorkingInterval"][];
+        };
+        WorkingInterval: {
+            end: string;
+            start: string;
+            /** Format: int32 */
+            weekday: number;
         };
     };
     responses: never;
@@ -424,6 +532,32 @@ export interface operations {
             };
         };
     };
+    availability: {
+        parameters: {
+            query: {
+                professionalId: string;
+                serviceId: string;
+                date: string;
+            };
+            header?: never;
+            path: {
+                tenantId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AvailabilityView"];
+                };
+            };
+        };
+    };
     professionals: {
         parameters: {
             query?: never;
@@ -495,6 +629,56 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ProfessionalView"];
+                };
+            };
+        };
+    };
+    workingHours: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenantId: string;
+                professionalId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["WorkingHoursView"];
+                };
+            };
+        };
+    };
+    replaceWorkingHours: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenantId: string;
+                professionalId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkingHoursRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["WorkingHoursView"];
                 };
             };
         };
@@ -571,6 +755,78 @@ export interface operations {
                 content: {
                     "*/*": components["schemas"]["ServiceView"];
                 };
+            };
+        };
+    };
+    timeOff: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+            };
+            header?: never;
+            path: {
+                tenantId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["TimeOffView"][];
+                };
+            };
+        };
+    };
+    createTimeOff: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenantId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TimeOffRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["TimeOffView"];
+                };
+            };
+        };
+    };
+    deleteTimeOff: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenantId: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

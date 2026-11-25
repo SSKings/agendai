@@ -7,7 +7,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.sskings.agendai.common.ApiException;
+
 import java.time.Clock;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 
@@ -42,6 +45,15 @@ public class TenantService {
         Membership m = access.member(id);
         Tenant t = tenants.findById(id).orElseThrow();
         return new TenantView(t.getId(), t.getName(), t.getSlug(), t.getTimeZone(), m.getRole());
+    }
+
+    /**
+     * Fuso do estabelecimento, dentro de uma transação que já passou pelo guard. Não substitui o guard: o RLS de
+     * {@code tenants} mostra todos os estabelecimentos de que o usuário participa.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public ZoneId zoneOf(UUID tenantId) {
+        return ZoneId.of(tenants.timeZoneOf(tenantId).orElseThrow(() -> ApiException.notFound(TenantAccess.NOT_FOUND)));
     }
 
     /** Os estabelecimentos de quem está logado (o RLS já restringe às participações dele). */

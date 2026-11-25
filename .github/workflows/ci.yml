@@ -60,7 +60,8 @@ jobs:
             tests: com.sskings.agendai.catalog.*Test,com.sskings.agendai.schedule.*Test,com.sskings.agendai.booking.*Test
           - area: agendamentos
             classes: com.sskings.agendai.booking.*
-            tests: com.sskings.agendai.booking.*Test
+            # a regra "profissional só na própria agenda" é testada junto com o convite (quem cria o vínculo)
+            tests: com.sskings.agendai.booking.*Test,com.sskings.agendai.catalog.InviteIntegrationTest
     defaults:
       run:
         working-directory: backend

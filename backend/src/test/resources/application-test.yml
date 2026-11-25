@@ -1,0 +1,12 @@
+# Testes: PostgreSQL e Redis de verdade (Testcontainers); conexões definidas em TestcontainersConfiguration.
+spring:
+  docker:
+    compose:
+      enabled: false
+agendai:
+  jwt:
+    secret: test-secret-only-for-tests-0123456789-abcdefghijklmnopqrstuvwxyz
+  refresh:
+    secure-cookie: true
+  cors:
+    allowed-origins: http://localhost:5173

@@ -1,0 +1,45 @@
+# Serviços de DESENVOLVIMENTO. O Spring Boot sobe este compose sozinho em `./mvnw spring-boot:run` (perfil dev).
+# Portas só em 127.0.0.1; imagens fixadas por digest (a tag pode ser republicada).
+#
+# Os mesmos três usuários do banco de produção (deploy/db-init/01-roles.sh): o superusuário só cria; o Flyway migra
+# como dono; a API conecta sem DDL e sem ignorar o RLS. O rótulo "ignore" impede o Spring de trocar as credenciais do
+# application-dev.yml pelas do superusuário do container.
+name: agendai-dev
+
+services:
+  postgres:
+    image: postgres:16-alpine@sha256:f2f98726820d0342055351c6e9d36e705f5bfffb3dd53ff556325114b08afb6d
+    environment:
+      POSTGRES_DB: agendai
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: dev-admin-password
+      DATABASE_MIGRATION_USERNAME: agendai_owner
+      DATABASE_MIGRATION_PASSWORD: dev-owner-password
+      DATABASE_USERNAME: agendai_app
+      DATABASE_PASSWORD: dev-app-password
+    ports:
+      - "127.0.0.1:5435:5432"
+    volumes:
+      - agendai-dev-data:/var/lib/postgresql/data
+      - ../deploy/db-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-d", "agendai"]
+      interval: 2s
+      retries: 30
+    labels:
+      org.springframework.boot.ignore: true
+
+  redis:
+    image: redis:7.4-alpine@sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe
+    command: ["redis-server", "--requirepass", "dev-redis-password", "--save", "", "--appendonly", "no"]
+    ports:
+      - "127.0.0.1:6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "dev-redis-password", "--no-auth-warning", "ping"]
+      interval: 2s
+      retries: 30
+    labels:
+      org.springframework.boot.ignore: true
+
+volumes:
+  agendai-dev-data: {}

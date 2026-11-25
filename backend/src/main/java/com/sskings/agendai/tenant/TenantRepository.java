@@ -1,0 +1,14 @@
+package com.sskings.agendai.tenant;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.util.UUID;
+
+public interface TenantRepository extends JpaRepository<Tenant, UUID> {
+
+    /** Função do banco (SECURITY DEFINER): o RLS esconde os outros estabelecimentos, mas o link precisa ser único. */
+    @Query(value = "SELECT slug_taken(:slug)", nativeQuery = true)
+    boolean slugTaken(@Param("slug") String slug);
+}

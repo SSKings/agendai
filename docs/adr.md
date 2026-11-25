@@ -44,7 +44,9 @@ SameSite=Strict`, de uso único com rotação; reuso de um refresh já trocado r
 
 **Contexto:** vazamento entre estabelecimentos é o pior incidente possível para o produto.
 **Decisão:** (1) guard de acesso na API; (2) consultas e FKs compostas com `tenant_id`; (3) **RLS no PostgreSQL**, com o
-`tenant_id` da requisição definido na transação (`SET LOCAL`), e o usuário da API sem permissão de ignorar o RLS.
+`tenant_id` da requisição definido na transação (`set_config('app.tenant_id', ..., true)`, equivalente a `SET LOCAL`;
+o usuário vai em `app.user_id`, definido pelo `RlsTransactionManager` no início de cada transação), e o usuário da API
+sem permissão de ignorar o RLS. `users` e `refresh_tokens` são globais (sem `tenant_id`): ficam fora do RLS.
 **Consequência:** um bug numa consulta não vaza dados; testes precisam cobrir as três camadas, inclusive cada uma
 sozinha.
 

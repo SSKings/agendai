@@ -4,7 +4,8 @@ Agendamento online para pequenos negócios — barbearias, salões, clínicas, e
 o cliente escolhe o serviço, o profissional e o horário em segundos, sem criar conta, e recebe lembretes antes do
 atendimento. Cancelou? A vaga vai sozinha para quem está na lista de espera.
 
-> **Situação:** em planejamento — fase 0 (fundação). Ver [docs/roadmap.md](docs/roadmap.md).
+> **Situação:** fase 0 (fundação) — login da equipe, estabelecimento com isolamento em três camadas e toda a rede de
+> proteção no CI. Ver [docs/roadmap.md](docs/roadmap.md).
 
 ## Princípios (não negociáveis)
 
@@ -27,10 +28,25 @@ atendimento. Cancelou? A vaga vai sozinha para quem está na lista de espera.
 | [docs/adr.md](docs/adr.md) | Decisões de arquitetura e o porquê de cada uma |
 | [CLAUDE.md](CLAUDE.md) | Regras de trabalho para o desenvolvimento assistido (Claude Code) |
 
-## Stack planejada
+## Rodando localmente
 
-**Backend:** Java 17 · Spring Boot 4 · Spring Security · Spring Data JPA · Flyway · PostgreSQL · Redis · RabbitMQ ·
-Testcontainers · JaCoCo · PIT
+Pré-requisitos: Java 17, Node 22+ e Docker.
+
+```bash
+cd backend && ./mvnw spring-boot:run     # sobe PostgreSQL (com os três usuários) e Redis do compose.yaml; API em :8080
+cd frontend && npm ci && npm run dev     # http://localhost:5173 (chama a API pelo proxy /api)
+```
+
+Documentação interativa da API (só em dev): http://localhost:8080/swagger-ui.html
+
+Pilha de produção (nginx com TLS, API, PostgreSQL, Redis), como o CI sobe: veja o cabeçalho de
+[deploy/docker-compose.prod.yml](deploy/docker-compose.prod.yml) e o teste ponta a ponta
+[deploy/e2e-smoke.py](deploy/e2e-smoke.py).
+
+## Stack
+
+**Backend:** Java 17 · Spring Boot 4 · Spring Security · Spring Data JPA · Flyway · PostgreSQL (com RLS) · Redis ·
+RabbitMQ (fase 3) · Testcontainers · ArchUnit · JaCoCo · PIT
 **Frontend:** React · TypeScript · Vite · Tailwind CSS · Vitest · Testing Library (tipos gerados do contrato OpenAPI)
 **Infra:** Docker · nginx · GitHub Actions · Trivy · CodeQL · Terraform (AWS) · OpenTelemetry · k6
 

@@ -5,14 +5,18 @@
 1. **Nada entra sem teste.** Toda mudança de comportamento — funcionalidade, correção, controle de segurança, consulta
    nova — vem com o teste que a cobre, no mesmo PR.
 2. **TDD:** o teste é escrito antes do código e precisa ser visto falhando pelo motivo certo.
-3. **Meta: 100% de cobertura de linhas e de ramos**, no backend e no frontend. O CI exige 100%.
+3. **Meta: 100% de cobertura de linhas e de ramos**, no backend e no frontend. O CI exige 100%. Exceções atuais:
+   `AgendaiApplication` (só chama `SpringApplication.run`), e no front `main.tsx` (só monta o app) e `schema.d.ts`
+   (tipos gerados do contrato).
    - Exceções são raras e **explícitas**: ficam numa lista de exclusão no build (JaCoCo / Vitest), cada uma com um
      comentário dizendo por que não dá para testar (ex.: a classe `main`, código gerado). Exceção nova exige
      justificativa no PR.
    - Cobertura alta não basta: um teste que executa a linha sem verificar o resultado não protege nada. Por isso há
      teste de mutação.
 4. **Teste de mutação (PIT)** no domínio e na segurança: mínimo de **95%** dos defeitos injetados pegos. Os
-   sobreviventes restantes precisam ser equivalentes (não mudam comportamento) e são revisados a cada fase.
+   sobreviventes restantes precisam ser equivalentes (não mudam comportamento) e são revisados a cada fase. Hoje o
+   alvo é `security`, `auth` e o validador de produção; as regras de `auth` dependem do banco, então a mutação delas
+   roda com os testes de integração do pacote.
 5. **Correção de bug começa por um teste que reproduz o bug** e falha no código antigo.
 6. Testes rodam com a **JVM em UTC** (como o CI e o servidor).
 
@@ -21,7 +25,7 @@
 | Tipo | Ferramenta | O que cobre |
 |---|---|---|
 | Unidade | JUnit, AssertJ | Regras puras: cálculo de horários, política de cancelamento, tokens, senha |
-| Integração | Spring Boot Test + **Testcontainers** (PostgreSQL, Redis, RabbitMQ **de verdade**) | Rotas, transações, restrições do banco, RLS, filas — nunca H2 nem mocks de infraestrutura |
+| Integração | Spring Boot Test + **Testcontainers** (PostgreSQL e Redis **de verdade**; RabbitMQ a partir da fase 3) | Rotas, transações, restrições do banco, RLS, filas — nunca H2 nem mocks de infraestrutura. O banco de teste tem os mesmos três usuários da produção: a API conecta sem privilégio de ignorar o RLS |
 | Concorrência | Threads/`CompletableFuture` contra o banco real | 100 pedidos simultâneos no mesmo horário → exatamente 1 agendamento |
 | Resiliência | Testcontainers (pausar/derrubar o RabbitMQ ou o Redis) | Outbox não perde evento; worker idempotente; Redis fora → a API degrada sem quebrar o agendamento |
 | Isolamento | Teste que percorre todas as rotas | Nenhuma rota devolve ou altera dado de outro estabelecimento |

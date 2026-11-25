@@ -1,0 +1,29 @@
+// Mensagens da API (inglês, estáveis) → português. Mensagem desconhecida vira texto genérico: nada técnico na tela.
+
+const MESSAGES: Record<string, string> = {
+  'Invalid email or password': 'E-mail ou senha incorretos.',
+  'Too many failed attempts. Try again later': 'Conta bloqueada por muitas tentativas. Tente de novo mais tarde.',
+  'Too many requests': 'Muitas tentativas seguidas. Aguarde um minuto.',
+  'Email already in use': 'Este e-mail já tem cadastro.',
+  'Password is too common. Choose a less predictable one': 'Senha muito comum. Escolha uma menos previsível.',
+  'Password must not contain your name, your email or the app name':
+    'A senha não pode conter seu nome, seu e-mail ou o nome do app.',
+  'Invalid password': 'Senha atual incorreta.',
+  'New password must be different from the current one': 'A nova senha precisa ser diferente da atual.',
+  'Authentication required': 'Sua sessão terminou. Entre de novo.',
+  'Invalid session': 'Sua sessão terminou. Entre de novo.',
+  'Validation failed': 'Confira os campos.',
+  'Tenant not found': 'Estabelecimento não encontrado.',
+  'Request body too large': 'Os dados enviados são grandes demais.',
+}
+
+export const GENERIC_ERROR = 'Algo deu errado. Tente de novo.'
+export const OFFLINE = 'Sem conexão com o servidor. Confira a internet e tente de novo.'
+
+export function translate(message: string | undefined): string {
+  return (message && MESSAGES[message]) || GENERIC_ERROR
+}
+
+/** Mesma regra do backend (AuthDtos.PASSWORD_POLICY): 8 a 72 caracteres, com letras e números. */
+export const PASSWORD_RULE = /^(?=.*\p{L})(?=.*\d).{8,72}$/u
+export const PASSWORD_HINT = 'De 8 a 72 caracteres, com letras e números. Evite senhas comuns e seu nome.'

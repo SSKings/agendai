@@ -16,7 +16,7 @@ public record AgendaiProperties(Jwt jwt, Refresh refresh, Login login, RateLimit
 
     public record Login(int maxFailures, int lockMinutes) {}
 
-    public record RateLimit(int authPerMinute) {}
+    public record RateLimit(int authPerMinute, int publicPerMinute, int publicPerBusinessMinute) {}
 
     public record Cors(List<String> allowedOrigins) {
         public Cors {

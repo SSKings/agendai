@@ -74,6 +74,20 @@ class ArchitectureTest {
     }
 
     @Test
+    @DisplayName("Os métodos da página pública (sem guard próprio) só são chamados pela página pública; o guard público também")
+    void publicEntryPoints() {
+        noClasses().that().resideOutsideOfPackages("..publicbooking..")
+                .should().callMethod(com.sskings.agendai.catalog.CatalogService.class, "activeServices", java.util.UUID.class)
+                .orShould().callMethod(com.sskings.agendai.catalog.CatalogService.class, "activeProfessionalsFor", java.util.UUID.class, java.util.UUID.class)
+                .orShould().callMethod(com.sskings.agendai.tenant.PublicAccess.class, "enter", String.class)
+                .check(APP);
+        noClasses().that().resideOutsideOfPackages("..publicbooking..", "..schedule..")
+                .should().callMethod(com.sskings.agendai.schedule.ScheduleService.class, "slots", java.util.UUID.class, java.util.UUID.class,
+                        java.util.UUID.class, java.time.LocalDate.class)
+                .check(APP);
+    }
+
+    @Test
     @DisplayName("Repositório de usuários só é usado pelos módulos de usuário, autenticação e segurança")
     void userRepositoryUsage() {
         classes().that().areAssignableTo(Repository.class).and().resideInAPackage("..user..")

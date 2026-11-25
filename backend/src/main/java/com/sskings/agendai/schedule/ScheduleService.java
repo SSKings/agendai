@@ -186,6 +186,15 @@ public class ScheduleService {
     @Transactional(readOnly = true)
     public AvailabilityView availability(UUID tenantId, UUID professionalId, UUID serviceId, LocalDate date) {
         access.member(tenantId);
+        return slots(tenantId, professionalId, serviceId, date);
+    }
+
+    /**
+     * Os horários livres sem guard próprio: só dentro de uma transação que já passou por um (o do painel, acima, ou o
+     * da página pública). Mesma regra para os dois.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public AvailabilityView slots(UUID tenantId, UUID professionalId, UUID serviceId, LocalDate date) {
         CatalogService.Offer offer = catalog.offer(tenantId, professionalId, serviceId);
         ZoneId zone = tenants.zoneOf(tenantId);
         LocalDate today = LocalDate.now(clock.withZone(zone));

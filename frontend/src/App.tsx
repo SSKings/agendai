@@ -9,6 +9,7 @@ import { AgendaPage } from './pages/AgendaPage'
 import { AvailabilityPage } from './pages/AvailabilityPage'
 import { HomePage } from './pages/HomePage'
 import { HoursPage } from './pages/HoursPage'
+import { PublicBookingPage } from './pages/PublicBookingPage'
 import { LoginPage } from './pages/LoginPage'
 import { RegisterPage } from './pages/RegisterPage'
 import { ServicesPage } from './pages/ServicesPage'
@@ -27,26 +28,34 @@ function Gate({ need, children }: { need: Exclude<Status, 'loading'>; children: 
 
 export function App() {
   return (
-    <AuthProvider>
-      <Routes>
-        <Route path="/entrar" element={<Gate need="out"><LoginPage /></Gate>} />
-        <Route path="/cadastro" element={<Gate need="out"><RegisterPage /></Gate>} />
-        <Route path="/convite" element={<AcceptInvitePage />} />
-        <Route element={<Gate need="in"><Layout /></Gate>}>
-          <Route index element={<HomePage />} />
-          <Route path="conta" element={<AccountPage />} />
-          <Route path="e/:tenantId" element={<TenantLayout />}>
-            <Route index element={<Navigate to="servicos" replace />} />
-            <Route path="agenda" element={<AgendaPage />} />
-            <Route path="servicos" element={<ServicesPage />} />
-            <Route path="equipe" element={<TeamPage />} />
-            <Route path="expediente" element={<HoursPage />} />
-            <Route path="bloqueios" element={<TimeOffPage />} />
-            <Route path="horarios" element={<AvailabilityPage />} />
-          </Route>
+    <Routes>
+      {/* página do cliente: fora do AuthProvider — não tenta renovar sessão da equipe (nem gasta o limite de login do IP) */}
+      <Route path="/agendar/:slug" element={<PublicBookingPage />} />
+      <Route path="*" element={<AuthProvider><StaffRoutes /></AuthProvider>} />
+    </Routes>
+  )
+}
+
+function StaffRoutes() {
+  return (
+    <Routes>
+      <Route path="/entrar" element={<Gate need="out"><LoginPage /></Gate>} />
+      <Route path="/cadastro" element={<Gate need="out"><RegisterPage /></Gate>} />
+      <Route path="/convite" element={<AcceptInvitePage />} />
+      <Route element={<Gate need="in"><Layout /></Gate>}>
+        <Route index element={<HomePage />} />
+        <Route path="conta" element={<AccountPage />} />
+        <Route path="e/:tenantId" element={<TenantLayout />}>
+          <Route index element={<Navigate to="servicos" replace />} />
+          <Route path="agenda" element={<AgendaPage />} />
+          <Route path="servicos" element={<ServicesPage />} />
+          <Route path="equipe" element={<TeamPage />} />
+          <Route path="expediente" element={<HoursPage />} />
+          <Route path="bloqueios" element={<TimeOffPage />} />
+          <Route path="horarios" element={<AvailabilityPage />} />
         </Route>
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </AuthProvider>
+      </Route>
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   )
 }

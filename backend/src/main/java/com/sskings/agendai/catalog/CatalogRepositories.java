@@ -39,6 +39,13 @@ interface ProfessionalRepository extends JpaRepository<Professional, UUID> {
 
     long countByTenantId(UUID tenantId);
 
+    /** Ativos que fazem o serviço, em ordem de nome (página pública). */
+    @Query("""
+            select p from Professional p where p.tenantId = :tenant and p.active = true and exists (
+              select 1 from ProfessionalService ps where ps.tenantId = :tenant and ps.id.professionalId = p.id and ps.id.serviceId = :service)
+            order by lower(p.name)""")
+    List<Professional> activeFor(@Param("tenant") UUID tenantId, @Param("service") UUID serviceId);
+
     /** Profissional ATIVO vinculado à conta: desativado, a conta deixa de agir pela agenda dele. */
     @Query("select p.id from Professional p where p.tenantId = :tenant and p.userId = :user and p.active = true")
     Optional<UUID> idOfUser(@Param("tenant") UUID tenantId, @Param("user") UUID userId);

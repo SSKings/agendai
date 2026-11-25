@@ -41,6 +41,9 @@ class RateLimitFilterTest {
         assertThat(RateLimitFilter.limited("POST", "/api/auth/logout")).isFalse();
         assertThat(RateLimitFilter.limited("GET", "/api/auth/login")).isFalse();
         assertThat(RateLimitFilter.limited("POST", "/api/me")).isFalse();
+        assertThat(RateLimitFilter.publicPage("GET", "/api/public/barbearia")).isTrue();
+        assertThat(RateLimitFilter.publicPage("GET", "/api/publicx")).isFalse();
+        assertThat(RateLimitFilter.publicPage("GET", "/api/tenants/x")).isFalse();
     }
 
     @Test
@@ -117,5 +120,61 @@ class RateLimitFilterTest {
         assertThat(f.shouldWarn(100)).isFalse();
         assertThat(f.shouldWarn(100)).isFalse();
         assertThat(f.shouldWarn(101)).isTrue();
+    }
+
+    private static MockHttpServletResponse publicGet(RateLimitFilter f, String path, String ip, MockFilterChain chain) throws Exception {
+        MockHttpServletRequest req = new MockHttpServletRequest("GET", path);
+        req.setRemoteAddr(ip);
+        MockHttpServletResponse res = new MockHttpServletResponse();
+        f.doFilter(req, res, chain);
+        return res;
+    }
+
+    @Test
+    @DisplayName("Página pública: conta por IP e, somando todas as origens, por estabelecimento; acima de qualquer um, 429")
+    void publicPerIpAndPerBusiness() throws Exception {
+        MutableClock clock = new MutableClock();
+        long minute = clock.instant().getEpochSecond() / 60;
+        java.util.List<String> keys = new java.util.ArrayList<>();
+        // 1º pedido: IP 1, estabelecimento 1 → passa; 2º: IP 2 (1), estabelecimento 2 → passa; 3º: IP 3 (1), estabelecimento 3 → 429
+        RateLimitFilter f = RateLimitFilter.forPublicPages(5, 2, redisCounting(keys, 1, 1, 1, 2, 1, 3), clock);
+        MockFilterChain a = new MockFilterChain();
+        publicGet(f, "/api/public/barbearia/services", "1.1.1.1", a);
+        MockFilterChain b = new MockFilterChain();
+        publicGet(f, "/api/public/barbearia", "2.2.2.2", b);
+        MockFilterChain c = new MockFilterChain();
+        MockHttpServletResponse blocked = publicGet(f, "/api/public/barbearia/availability", "3.3.3.3", c);
+        assertThat(a.getRequest()).isNotNull();
+        assertThat(b.getRequest()).isNotNull();
+        assertThat(c.getRequest()).as("muitos IPs, um estabelecimento").isNull();
+        assertThat(blocked.getStatus()).isEqualTo(429);
+        assertThat(keys).containsExactly("rl:public:1.1.1.1:" + minute, "rl:public:t:barbearia:" + minute,
+                "rl:public:2.2.2.2:" + minute, "rl:public:t:barbearia:" + minute,
+                "rl:public:3.3.3.3:" + minute, "rl:public:t:barbearia:" + minute);
+    }
+
+    @Test
+    @DisplayName("Página pública: acima do limite do IP já recusa (nem conta no do estabelecimento); Redis fora deixa passar")
+    void publicPerIpFirstAndFailOpen() throws Exception {
+        java.util.List<String> keys = new java.util.ArrayList<>();
+        RateLimitFilter f = RateLimitFilter.forPublicPages(1, 100, redisCounting(keys, 2), new MutableClock());
+        MockFilterChain chain = new MockFilterChain();
+        assertThat(publicGet(f, "/api/public/x", "1.1.1.1", chain).getStatus()).isEqualTo(429);
+        assertThat(keys).hasSize(1);
+
+        StringRedisTemplate down = mock(StringRedisTemplate.class);
+        @SuppressWarnings("unchecked") ValueOperations<String, String> ops = mock(ValueOperations.class);
+        when(down.opsForValue()).thenReturn(ops);
+        when(ops.increment(anyString())).thenThrow(new RedisConnectionFailureException("down"));
+        MockFilterChain open = new MockFilterChain();
+        publicGet(RateLimitFilter.forPublicPages(1, 1, down, new MutableClock()), "/api/public/x", "1.1.1.1", open);
+        assertThat(open.getRequest()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("O estabelecimento vem do primeiro segmento depois de /api/public/")
+    void businessOf() {
+        assertThat(RateLimitFilter.businessOf("/api/public/barbearia")).isEqualTo("barbearia");
+        assertThat(RateLimitFilter.businessOf("/api/public/barbearia/services/x/professionals")).isEqualTo("barbearia");
     }
 }

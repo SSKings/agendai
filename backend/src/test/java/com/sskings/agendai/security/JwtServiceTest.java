@@ -19,7 +19,7 @@ class JwtServiceTest {
     static final String SECRET = "test-secret-only-for-tests-0123456789-abcdefghijklmnopqrstuvwxyz";
     private final MutableClock clock = new MutableClock();
     private final JwtService jwt = new JwtService(new AgendaiProperties(new AgendaiProperties.Jwt(SECRET, 15),
-            new AgendaiProperties.Refresh(30, true), new AgendaiProperties.Login(5, 15), new AgendaiProperties.RateLimit(20),
+            new AgendaiProperties.Refresh(30, true), new AgendaiProperties.Login(5, 15), new AgendaiProperties.RateLimit(20, 120, 1200),
             65536, new AgendaiProperties.Cors(List.of())), clock);
 
     @Test

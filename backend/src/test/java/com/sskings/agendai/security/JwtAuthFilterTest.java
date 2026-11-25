@@ -24,7 +24,7 @@ import static org.mockito.Mockito.when;
 class JwtAuthFilterTest {
 
     private final JwtService jwt = new JwtService(new AgendaiProperties(new AgendaiProperties.Jwt(JwtServiceTest.SECRET, 15),
-            new AgendaiProperties.Refresh(30, true), new AgendaiProperties.Login(5, 15), new AgendaiProperties.RateLimit(20),
+            new AgendaiProperties.Refresh(30, true), new AgendaiProperties.Login(5, 15), new AgendaiProperties.RateLimit(20, 120, 1200),
             65536, new AgendaiProperties.Cors(List.of())), new MutableClock());
     private final UserRepository users = mock(UserRepository.class);
     private final JwtAuthFilter filter = new JwtAuthFilter(jwt, users);

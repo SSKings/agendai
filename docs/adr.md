@@ -135,3 +135,24 @@ uso sem guard próprio (`Propagation.MANDATORY`), chamado pelo painel e pela pá
 **Consequência:** uma porta de escrita fora do RLS, pequena e testada sozinha (`InviteRowLevelSecurityTest`); a regra
 "de quem é a agenda" num lugar só. Para a fase 2, o agendamento público precisa de uma origem "cliente" além do
 `Actor` da equipe (ADR-009): a checagem de acesso fica na entrada, não no caso de uso.
+
+## ADR-011 — Página pública: transação anônima dentro do estabelecimento do link
+
+**Contexto:** o cliente agenda sem login (fase 2). A requisição anônima não tem `app.user_id` nem `app.tenant_id`, e
+o RLS esconde tudo — inclusive o estabelecimento dono do link.
+**Decisão:**
+- O link (slug) vira o estabelecimento da transação pelo guard `tenant.PublicAccess`: formato validado, depois a
+  função `tenant_by_slug` (`SECURITY DEFINER`, V6) devolve **só o id** — nenhum outro dado; link malformado ou
+  inexistente dão o mesmo 404. A partir daí valem as políticas de sempre (`tenant_id = app_tenant()`), sem usuário.
+- Rotas públicas só em `/api/public/{link}/…`; na 2a, só `GET`. O que sai é o mínimo para o cliente: nome e fuso,
+  serviços ativos (sem preparo), profissionais ativos (só nome) e horários livres. Inativo, sem vínculo ou
+  inexistente: o mesmo 404 (nada a deduzir).
+- As regras são as do painel, chamadas sem guard próprio (`ScheduleService.slots`, `CatalogService.activeServices` /
+  `activeProfessionalsFor`, com `Propagation.MANDATORY`) e só pela página pública — ArchUnit garante quem chama.
+- Limite por IP próprio (120/min) e, somando todas as origens, por estabelecimento (1200/min), no Redis; separado do
+  limite da autenticação. A página do cliente no front fica fora do contexto de sessão da equipe (não tenta renovar
+  sessão, não gasta o limite de login do IP compartilhado do salão).
+- Escrita anônima (2b: reserva, cliente, agendamento PENDING) só por esse mesmo guard, com teto por IP/estabelecimento
+  e confirmação por código — o RLS continua valendo sem usuário.
+**Consequência:** a página pública não tem caminho para dados de outro estabelecimento nem de clientes; a regra de
+horários é uma só para painel e página.

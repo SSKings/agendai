@@ -41,9 +41,50 @@ jobs:
       - name: Build, Test and Coverage check (JaCoCo)
         run: ./mvnw -B clean verify
 
-      # Teste de mutação da segurança (senha, tokens, filtros, limite por IP) e do validador de produção: mínimo 95%.
+  # Teste de mutação: mínimo 95% em cada área. Fora do job do Backend e dividido por área, em paralelo — o PR espera o
+  # job mais lento, não a soma (com tudo num job só, a mutação passou de 35 min na fase 1c). Cada área roda só os
+  # testes dela e de quem a usa.
+  mutation:
+    name: Mutação (${{ matrix.area }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - area: segurança
+            classes: com.sskings.agendai.security.*,com.sskings.agendai.auth.*,com.sskings.agendai.config.ProductionConfigValidator*
+            tests: com.sskings.agendai.security.*Test,com.sskings.agendai.auth.*Test,com.sskings.agendai.config.ProductionConfigValidatorTest
+          - area: catálogo e agenda
+            classes: com.sskings.agendai.catalog.*,com.sskings.agendai.schedule.*,com.sskings.agendai.tenant.TenantAccess
+            # os agendamentos usam o catálogo e a agenda (offer, calendar): os testes deles também matam mutantes aqui
+            tests: com.sskings.agendai.catalog.*Test,com.sskings.agendai.schedule.*Test,com.sskings.agendai.booking.*Test
+          - area: agendamentos
+            classes: com.sskings.agendai.booking.*
+            tests: com.sskings.agendai.booking.*Test
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Cache Maven Wrapper
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.m2/wrapper
+          key: maven-wrapper-${{ hashFiles('backend/.mvn/wrapper/maven-wrapper.properties') }}
+
       - name: Mutation testing (PIT)
-        run: ./mvnw -B pitest:mutationCoverage
+        env:
+          CLASSES: ${{ matrix.classes }}
+          TESTS: ${{ matrix.tests }}
+        run: ./mvnw -B test-compile pitest:mutationCoverage "-DtargetClasses=$CLASSES" "-DtargetTests=$TESTS"
 
   frontend:
     name: Frontend

@@ -15,6 +15,10 @@
 	<description>Agendaí — agendamento online para pequenos negócios</description>
 
 	<properties>
+		<!-- Alvos da mutação (PIT): tudo, para rodar local. O CI sobrescreve com -DtargetClasses/-DtargetTests e roda uma
+		     área por job, em paralelo (.github/workflows/ci.yml). O guard TenantAccess morre pelos testes do catálogo. -->
+		<targetClasses>com.sskings.agendai.security.*,com.sskings.agendai.auth.*,com.sskings.agendai.config.ProductionConfigValidator*,com.sskings.agendai.catalog.*,com.sskings.agendai.schedule.*,com.sskings.agendai.tenant.TenantAccess,com.sskings.agendai.booking.*</targetClasses>
+		<targetTests>com.sskings.agendai.security.*Test,com.sskings.agendai.auth.*Test,com.sskings.agendai.config.ProductionConfigValidatorTest,com.sskings.agendai.catalog.*Test,com.sskings.agendai.schedule.*Test,com.sskings.agendai.booking.*Test</targetTests>
 		<java.version>17</java.version>
 		<!-- vazio por padrão: o JaCoCo preenche no verify; sem isso, quem roda sem ele (PIT) recebe "@{argLine}" literal -->
 		<argLine></argLine>
@@ -224,23 +228,7 @@
 					</dependency>
 				</dependencies>
 				<configuration>
-					<targetClasses>
-						<param>com.sskings.agendai.security.*</param>
-						<param>com.sskings.agendai.auth.*</param>
-						<param>com.sskings.agendai.catalog.*</param>
-						<param>com.sskings.agendai.schedule.*</param>
-						<param>com.sskings.agendai.booking.*</param>
-						<param>com.sskings.agendai.tenant.TenantAccess</param>
-						<param>com.sskings.agendai.config.ProductionConfigValidator*</param>
-					</targetClasses>
-					<targetTests>
-						<param>com.sskings.agendai.security.*Test</param>
-						<param>com.sskings.agendai.auth.*Test</param>
-						<param>com.sskings.agendai.catalog.*Test</param>
-						<param>com.sskings.agendai.schedule.*Test</param>
-						<param>com.sskings.agendai.booking.*Test</param>
-						<param>com.sskings.agendai.config.ProductionConfigValidatorTest</param>
-					</targetTests>
+					<!-- alvos nas propriedades targetClasses/targetTests (acima): o CI divide a mutação por área -->
 					<excludedTestClasses>
 						<param>com.sskings.agendai.security.*IntegrationTest</param>
 					</excludedTestClasses>

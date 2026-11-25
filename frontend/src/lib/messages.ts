@@ -24,6 +24,15 @@ const MESSAGES: Record<string, string> = {
   'Professional limit reached': 'Limite de profissionais atingido.',
   'Unknown service': 'Algum serviço escolhido não existe mais. Recarregue a página.',
   'Durations must be multiples of 5 minutes': 'Duração e intervalo vão de 5 em 5 minutos.',
+  'End must be after start': 'O fim precisa ser depois do início.',
+  'Overlapping working hours': 'Há faixas sobrepostas no mesmo dia.',
+  'Times must be multiples of 5 minutes': 'Os horários vão de 5 em 5 minutos.',
+  'Time off not found': 'Bloqueio não encontrado. Recarregue a página.',
+  'Time off already ended': 'Esse período já terminou.',
+  'Time off longer than 92 days': 'Um bloqueio pode durar no máximo 92 dias.',
+  'Time off limit reached': 'Limite de bloqueios futuros atingido.',
+  'Date out of range': 'Escolha uma data entre hoje e 180 dias à frente.',
+  'Professional does not perform this service': 'Esse profissional não faz esse serviço.',
 }
 
 export const GENERIC_ERROR = 'Algo deu errado. Tente de novo.'

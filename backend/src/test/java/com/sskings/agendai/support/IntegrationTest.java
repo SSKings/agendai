@@ -108,6 +108,15 @@ public abstract class IntegrationTest {
         }
     }
 
+    /** SQL direto como dono das tabelas (fora do RLS), para preparar volume ou estados que a API não cria. */
+    protected void ownerSql(String sql, Object... params) throws Exception {
+        try (var c = java.sql.DriverManager.getConnection(postgres.getJdbcUrl(), "agendai_owner", "owner-test");
+             var st = c.prepareStatement(sql)) {
+            for (int i = 0; i < params.length; i++) st.setObject(i + 1, params[i]);
+            st.executeUpdate();
+        }
+    }
+
     protected Session register() throws Exception {
         return register("Ana Souza", email(), "Barbearia da Ana");
     }

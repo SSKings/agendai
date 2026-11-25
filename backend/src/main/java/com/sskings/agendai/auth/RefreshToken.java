@@ -17,7 +17,7 @@ import java.util.UUID;
 @Table(name = "refresh_tokens")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class RefreshToken {
+class RefreshToken {
 
     @Id
     private UUID id;

@@ -17,7 +17,7 @@ A coluna "Teste" aponta o teste que falha sem o controle (ou a fase em que o con
 
 | Ameaça | Controle | Teste |
 |---|---|---|
-| Ver ou alterar dados de outro estabelecimento | Guard de acesso a cada requisição + consultas filtradas por `tenant_id` + FKs compostas + **Row-Level Security** no PostgreSQL | Teste de isolamento varrendo **todas** as rotas com ids de outro estabelecimento; teste que desliga o guard e confirma que o RLS ainda barra. Hoje: `TenantIsolationTest`, `RowLevelSecurityTest` (sem guard, como `agendai_app`), `TenantAccessTest`; catálogo: `CatalogIntegrationTest.isolation` / `onlyOwnerWrites` (só o dono altera) e `CatalogRowLevelSecurityTest` (RLS sozinho e FK composta impedindo ligar dados de estabelecimentos diferentes) |
+| Ver ou alterar dados de outro estabelecimento | Guard de acesso a cada requisição + consultas filtradas por `tenant_id` + FKs compostas + **Row-Level Security** no PostgreSQL | Teste de isolamento varrendo **todas** as rotas com ids de outro estabelecimento; teste que desliga o guard e confirma que o RLS ainda barra. Hoje: `TenantIsolationTest`, `RowLevelSecurityTest` (sem guard, como `agendai_app`), `TenantAccessTest`; catálogo: `CatalogIntegrationTest.isolation` / `onlyOwnerWrites` (só o dono altera) e `CatalogRowLevelSecurityTest` (RLS sozinho e FK composta impedindo ligar dados de estabelecimentos diferentes); agenda: `ScheduleIntegrationTest` (`*Access`: 404 para profissional, serviço ou bloqueio alheio; só o dono altera) e `ScheduleRowLevelSecurityTest` (RLS, FK composta e CHECKs do banco) |
 | Agendamento falso em nome de outra pessoa / spam | Confirmação por código de 6 dígitos no e-mail (só o hash, 10 min, 5 tentativas) | fase 2 |
 | Robô esgotando a agenda com reservas temporárias | Limite por IP e por estabelecimento **no Redis** (vale entre instâncias); reservas expiram em 5 min; teto de reservas abertas por IP | Limite por IP no Redis: `RateLimitIntegrationTest`, `RateLimitFilterTest`. Reservas e teto por IP: fase 2 |
 | Força bruta no login da equipe | Bloqueio progressivo por conta, limite por IP (IPv6 por /64), mesma resposta para e-mail inexistente | `AuthIntegrationTest.lockout` / `lockoutCap` / `login` (mesma resposta para e-mail inexistente), `RateLimitIntegrationTest.limitPerIp` / `ipv6Block`, `RateLimitFilterTest` (Redis fora: não derruba a API) |
@@ -47,6 +47,11 @@ Corrigido na mesma revisão: a política de INSERT em `memberships` aceitava o p
 estabelecimento (um bug futuro que deixasse o `tenant_id` vir do cliente bastaria). Agora só entra quem cria um
 estabelecimento ainda sem membros; teste `RowLevelSecurityTest.cannotJoinForeignTenant`.
 
+Revisão da fase 1b (agenda): datas fora de uma janela razoável (listagem de 1 ano para trás a 2 para a frente; bloqueio
+terminando em até 2 anos) viram 400 em vez de 500 com stack no log, e nenhum bloqueio "eterno" ocupa o teto dos
+futuros; os horários livres só leem bloqueios ainda não terminados (no máximo 200), por maior que seja o histórico.
+Pendente: limpeza dos bloqueios antigos (job com trava, junto com a de `refresh_tokens`).
+
 ## LGPD
 
 - **Mínimo necessário:** do cliente, só nome, e-mail e telefone; nada de CPF.
@@ -54,6 +59,8 @@ estabelecimento ainda sem membros; teste `RowLevelSecurityTest.cannotJoinForeign
 - **Direitos do titular:** o cliente pode pedir exportação e exclusão; exclusão anonimiza e mantém só o necessário
   para a agenda do estabelecimento (horário, serviço).
 - **Retenção:** dados de clientes sem agendamento há 24 meses são anonimizados por um job.
+- **Motivo de bloqueio** ("médico", "exame") pode ser dado de saúde da equipe: só o dono vê; o resto da equipe vê só
+  o período (`ScheduleIntegrationTest.timeOffAccess`), e a página pública nunca o recebe.
 
 ## Processo
 

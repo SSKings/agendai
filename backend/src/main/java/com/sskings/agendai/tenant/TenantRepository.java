@@ -11,4 +11,7 @@ public interface TenantRepository extends JpaRepository<Tenant, UUID> {
     /** Função do banco (SECURITY DEFINER): o RLS esconde os outros estabelecimentos, mas o link precisa ser único. */
     @Query(value = "SELECT slug_taken(:slug)", nativeQuery = true)
     boolean slugTaken(@Param("slug") String slug);
+
+    @Query("select t.timeZone from Tenant t where t.id = :id")
+    java.util.Optional<String> timeZoneOf(@Param("id") UUID id);
 }

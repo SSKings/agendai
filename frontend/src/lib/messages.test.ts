@@ -10,6 +10,14 @@ describe('mensagens', () => {
     expect(translate(undefined)).toBe(GENERIC_ERROR)
   })
 
+  it('mensagens da agenda têm tradução própria (chave errada cairia no texto genérico)', () => {
+    for (const m of ['End must be after start', 'Overlapping working hours', 'Times must be multiples of 5 minutes',
+      'Time off not found', 'Time off already ended', 'Time off longer than 92 days', 'Time off limit reached',
+      'Date out of range', 'Professional does not perform this service']) {
+      expect(translate(m), m).not.toBe(GENERIC_ERROR)
+    }
+  })
+
   it('erro da API mostra a mensagem dela; outro erro mostra o texto do contexto', () => {
     expect(messageOf(new ApiError(409, 'Já existe.'), 'padrão')).toBe('Já existe.')
     expect(messageOf(new Error('stack interno'), 'padrão')).toBe('padrão')

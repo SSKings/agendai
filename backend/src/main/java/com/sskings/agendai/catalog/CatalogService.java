@@ -8,6 +8,7 @@ import com.sskings.agendai.common.ApiException;
 import com.sskings.agendai.tenant.TenantAccess;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
@@ -99,8 +100,7 @@ public class CatalogService {
     @Transactional
     public ProfessionalView updateProfessional(UUID tenantId, UUID id, ProfessionalRequest r) {
         access.owner(tenantId);
-        Professional p = professionals.findByIdAndTenantId(id, tenantId)
-                .orElseThrow(() -> ApiException.notFound("Professional not found"));
+        Professional p = professional(tenantId, id);
         checkProfessionalName(tenantId, r.name(), id);
         Set<UUID> ids = knownServices(tenantId, r.serviceIds());
         p.change(r.name(), r.active());
@@ -132,6 +132,37 @@ public class CatalogService {
 
     private static ProfessionalView view(Professional p, List<UUID> serviceIds) {
         return new ProfessionalView(p.getId(), p.getName(), p.isActive(), serviceIds);
+    }
+
+    // ---------- para outros módulos (agenda) ----------
+
+    /** O que a agenda precisa de um serviço feito por um profissional; {@code bookable}: os dois estão ativos. */
+    public record Offer(int durationMinutes, int bufferMinutes, boolean bookable) {}
+
+    static final String NOT_PERFORMED = "Professional does not perform this service";
+
+    /**
+     * Só dentro de uma transação que já passou pelo guard ({@link TenantAccess}): sem o estabelecimento definido, o RLS
+     * esconde tudo e a resposta é 404.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void requireProfessional(UUID tenantId, UUID professionalId) {
+        professional(tenantId, professionalId);
+    }
+
+    /** Como {@link #requireProfessional}: 404 para quem não é do estabelecimento; 400 se o profissional não faz o serviço. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Offer offer(UUID tenantId, UUID professionalId, UUID serviceId) {
+        Professional p = professional(tenantId, professionalId);
+        Service s = services.findByIdAndTenantId(serviceId, tenantId).orElseThrow(() -> ApiException.notFound("Service not found"));
+        if (!links.existsByTenantIdAndId(tenantId, new ProfessionalService.Link(professionalId, serviceId))) {
+            throw ApiException.badRequest(NOT_PERFORMED);
+        }
+        return new Offer(s.getDurationMinutes(), s.getBufferMinutes(), p.isActive() && s.isActive());
+    }
+
+    private Professional professional(UUID tenantId, UUID id) {
+        return professionals.findByIdAndTenantId(id, tenantId).orElseThrow(() -> ApiException.notFound("Professional not found"));
     }
 
     /** Sentinela para "nenhum id a ignorar" na checagem de nome repetido (evita um ramo só para null na consulta). */

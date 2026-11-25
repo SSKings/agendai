@@ -13,9 +13,12 @@ export function TenantLayout() {
   return (
     <section>
       <h1 className="text-2xl font-semibold text-slate-900">{tenant.name}</h1>
-      <nav aria-label="Seções do estabelecimento" className="mt-3 flex gap-2">
+      <nav aria-label="Seções do estabelecimento" className="mt-3 flex flex-wrap gap-2">
         <NavLink to="servicos" className={tab}>Serviços</NavLink>
         <NavLink to="equipe" className={tab}>Equipe</NavLink>
+        <NavLink to="expediente" className={tab}>Expediente</NavLink>
+        <NavLink to="bloqueios" className={tab}>Bloqueios</NavLink>
+        <NavLink to="horarios" className={tab}>Horários livres</NavLink>
       </nav>
       {/* key: ao trocar de estabelecimento a tela é recriada, e uma resposta atrasada do anterior não a sobrescreve */}
       <div className="mt-6" key={tenant.id}>

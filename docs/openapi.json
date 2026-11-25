@@ -13,6 +13,26 @@
         "required" : [ "accessToken", "user" ],
         "type" : "object"
       },
+      "AvailabilityView" : {
+        "properties" : {
+          "date" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "slots" : {
+            "items" : {
+              "format" : "date-time",
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "timeZone" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "date", "slots", "timeZone" ],
+        "type" : "object"
+      },
       "ChangePasswordRequest" : {
         "properties" : {
           "currentPassword" : {
@@ -228,6 +248,57 @@
         "required" : [ "id", "name", "role", "slug", "timeZone" ],
         "type" : "object"
       },
+      "TimeOffRequest" : {
+        "properties" : {
+          "end" : {
+            "example" : "2026-12-26T00:00",
+            "format" : "local-date-time",
+            "type" : "string"
+          },
+          "professionalId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "reason" : {
+            "maxLength" : 100,
+            "minLength" : 0,
+            "pattern" : "^[^\\p{Cntrl}\\u2028\\u2029]*$",
+            "type" : "string"
+          },
+          "start" : {
+            "example" : "2026-12-25T00:00",
+            "format" : "local-date-time",
+            "type" : "string"
+          }
+        },
+        "required" : [ "end", "start" ],
+        "type" : "object"
+      },
+      "TimeOffView" : {
+        "properties" : {
+          "end" : {
+            "format" : "local-date-time",
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "professionalId" : {
+            "format" : "uuid",
+            "type" : [ "string", "null" ]
+          },
+          "reason" : {
+            "type" : [ "string", "null" ]
+          },
+          "start" : {
+            "format" : "local-date-time",
+            "type" : "string"
+          }
+        },
+        "required" : [ "end", "id", "start" ],
+        "type" : "object"
+      },
       "UserView" : {
         "properties" : {
           "email" : {
@@ -242,6 +313,52 @@
           }
         },
         "required" : [ "email", "id", "name" ],
+        "type" : "object"
+      },
+      "WorkingHoursRequest" : {
+        "properties" : {
+          "intervals" : {
+            "items" : {
+              "$ref" : "#/components/schemas/WorkingInterval"
+            },
+            "maxItems" : 28,
+            "minItems" : 0,
+            "type" : "array"
+          }
+        },
+        "required" : [ "intervals" ],
+        "type" : "object"
+      },
+      "WorkingHoursView" : {
+        "properties" : {
+          "intervals" : {
+            "items" : {
+              "$ref" : "#/components/schemas/WorkingInterval"
+            },
+            "type" : "array"
+          }
+        },
+        "required" : [ "intervals" ],
+        "type" : "object"
+      },
+      "WorkingInterval" : {
+        "properties" : {
+          "end" : {
+            "pattern" : "([01]\\d|2[0-3]):[0-5]\\d|24:00",
+            "type" : "string"
+          },
+          "start" : {
+            "pattern" : "([01]\\d|2[0-3]):[0-5]\\d|24:00",
+            "type" : "string"
+          },
+          "weekday" : {
+            "format" : "int32",
+            "maximum" : 7,
+            "minimum" : 1,
+            "type" : "integer"
+          }
+        },
+        "required" : [ "end", "start", "weekday" ],
         "type" : "object"
       }
     }
@@ -425,6 +542,57 @@
         "tags" : [ "tenant-controller" ]
       }
     },
+    "/api/tenants/{tenantId}/availability" : {
+      "get" : {
+        "operationId" : "availability",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "tenantId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "professionalId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "serviceId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "date",
+          "required" : true,
+          "schema" : {
+            "format" : "date",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AvailabilityView"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "schedule-controller" ]
+      }
+    },
     "/api/tenants/{tenantId}/professionals" : {
       "get" : {
         "operationId" : "professionals",
@@ -535,6 +703,84 @@
         "tags" : [ "catalog-controller" ]
       }
     },
+    "/api/tenants/{tenantId}/professionals/{professionalId}/working-hours" : {
+      "get" : {
+        "operationId" : "workingHours",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "tenantId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "professionalId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/WorkingHoursView"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "schedule-controller" ]
+      },
+      "put" : {
+        "operationId" : "replaceWorkingHours",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "tenantId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "professionalId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/WorkingHoursRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/WorkingHoursView"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "schedule-controller" ]
+      }
+    },
     "/api/tenants/{tenantId}/services" : {
       "get" : {
         "operationId" : "services",
@@ -643,6 +889,115 @@
           }
         },
         "tags" : [ "catalog-controller" ]
+      }
+    },
+    "/api/tenants/{tenantId}/time-off" : {
+      "get" : {
+        "operationId" : "timeOff",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "tenantId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "from",
+          "required" : true,
+          "schema" : {
+            "format" : "date",
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "to",
+          "required" : true,
+          "schema" : {
+            "format" : "date",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/TimeOffView"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "schedule-controller" ]
+      },
+      "post" : {
+        "operationId" : "createTimeOff",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "tenantId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/TimeOffRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TimeOffView"
+                }
+              }
+            },
+            "description" : "Created"
+          }
+        },
+        "tags" : [ "schedule-controller" ]
+      }
+    },
+    "/api/tenants/{tenantId}/time-off/{id}" : {
+      "delete" : {
+        "operationId" : "deleteTimeOff",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "tenantId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "No Content"
+          }
+        },
+        "tags" : [ "schedule-controller" ]
       }
     }
   }

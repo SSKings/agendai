@@ -5,8 +5,8 @@ desempenho da fase medidas. Nenhuma fase começa antes de a anterior estar merge
 
 | Fase | Conteúdo | Situação |
 |---|---|---|
-| 0 — Fundação | Base do projeto e rede de proteção no CI | em revisão |
-| 1 — Agenda | Serviços, profissionais, expediente, horários livres, agendamento sem conflito | |
+| 0 — Fundação | Base do projeto e rede de proteção no CI | concluída (PR #1) |
+| 1 — Agenda | Serviços, profissionais, expediente, horários livres, agendamento sem conflito | em andamento |
 | 2 — Agendamento público | Link público, reserva temporária, confirmação por código, cancelar/remarcar | |
 | 3 — Eventos e notificações | Outbox, RabbitMQ, worker, lembretes | |
 | 4 — Lista de espera e indicadores | Oferta de vaga, política de cancelamento, faltas, painel | |
@@ -39,6 +39,10 @@ desempenho da fase medidas. Nenhuma fase começa antes de a anterior estar merge
 API não sobe com configuração insegura.
 
 ## Fase 1 — Agenda
+
+Em três PRs: **1a** catálogo e equipe (serviços, profissionais, quem faz o quê) — PR #6; **1b** expediente, bloqueios e
+horários livres; **1c** agendamento sem conflito e agenda do dia/semana. O convite para a equipe (vínculo de um
+profissional a uma conta) entra junto com a 1c.
 
 - Serviços (duração, preço, preparo), profissionais, quem faz o quê, convite para a equipe.
 - Expediente por profissional e dia, bloqueios e feriados.

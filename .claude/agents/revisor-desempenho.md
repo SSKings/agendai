@@ -14,7 +14,7 @@ Escalabilidade e Desempenho).
    - existe índice que a atende (veja as migrações)? Para as críticas (horários livres, agenda da semana, criação de
      agendamento), rode `EXPLAIN (ANALYZE, BUFFERS)` num PostgreSQL de teste com volume realista e mostre o plano;
    - há N+1 (consulta dentro de laço, coleção carregada preguiçosamente numa lista)?
-   - a rota é paginada e tem limite máximo de página?
+   - a rota é paginada (com limite máximo de página) ou tem teto fixo por estabelecimento garantido no servidor?
 3. Escalabilidade: há estado em memória local que importe entre requisições (mapas, contadores, caches locais)? Job
    que rodaria em todas as instâncias ao mesmo tempo (`@Scheduled` sem trava)? Algo que só funciona com uma instância?
 4. Concorrência: operações de "ler e depois escrever" sem garantia no banco; transações longas; travas em ordem que

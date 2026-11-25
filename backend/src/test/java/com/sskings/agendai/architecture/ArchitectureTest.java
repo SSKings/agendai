@@ -48,6 +48,16 @@ class ArchitectureTest {
     }
 
     @Test
+    @DisplayName("Repositórios e entidades do catálogo não são públicos: o compilador já barra o uso fora do módulo")
+    void catalogInternalsArePackagePrivate() {
+        classes().that().resideInAPackage("..catalog..")
+                .and(assignableTo(Repository.class).or(com.tngtech.archunit.core.domain.properties.CanBeAnnotated.Predicates
+                        .annotatedWith(jakarta.persistence.Entity.class)))
+                .should().notBePublic()
+                .check(APP);
+    }
+
+    @Test
     @DisplayName("Repositório de usuários só é usado pelos módulos de usuário, autenticação e segurança")
     void userRepositoryUsage() {
         classes().that().areAssignableTo(Repository.class).and().resideInAPackage("..user..")

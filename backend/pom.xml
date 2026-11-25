@@ -227,11 +227,14 @@
 					<targetClasses>
 						<param>com.sskings.agendai.security.*</param>
 						<param>com.sskings.agendai.auth.*</param>
+						<param>com.sskings.agendai.catalog.*</param>
+						<param>com.sskings.agendai.tenant.TenantAccess</param>
 						<param>com.sskings.agendai.config.ProductionConfigValidator*</param>
 					</targetClasses>
 					<targetTests>
 						<param>com.sskings.agendai.security.*Test</param>
 						<param>com.sskings.agendai.auth.*Test</param>
+						<param>com.sskings.agendai.catalog.*Test</param>
 						<param>com.sskings.agendai.config.ProductionConfigValidatorTest</param>
 					</targetTests>
 					<excludedTestClasses>

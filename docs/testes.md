@@ -15,8 +15,8 @@
      teste de mutação.
 4. **Teste de mutação (PIT)** no domínio e na segurança: mínimo de **95%** dos defeitos injetados pegos. Os
    sobreviventes restantes precisam ser equivalentes (não mudam comportamento) e são revisados a cada fase. Hoje o
-   alvo é `security`, `auth` e o validador de produção; as regras de `auth` dependem do banco, então a mutação delas
-   roda com os testes de integração do pacote.
+   alvo é `security`, `auth`, `catalog`, o guard `TenantAccess` e o validador de produção; as regras que dependem do
+   banco rodam a mutação com os testes de integração do pacote.
 5. **Correção de bug começa por um teste que reproduz o bug** e falha no código antigo.
 6. Testes rodam com a **JVM em UTC** (como o CI e o servidor).
 

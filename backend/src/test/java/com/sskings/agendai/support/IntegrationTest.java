@@ -92,6 +92,22 @@ public abstract class IntegrationTest {
     /** Dono recém-cadastrado: access token, refresh token, id e o estabelecimento criado no cadastro. */
     public record Session(String token, String refresh, String userId, String email, String tenantId) {}
 
+    @Autowired private org.testcontainers.postgresql.PostgreSQLContainer postgres;
+
+    /**
+     * Põe alguém na equipe de um estabelecimento direto no banco, como dono das tabelas (que não passa pelo RLS). Só
+     * para preparar cenários: o convite da equipe é outra funcionalidade.
+     */
+    protected void addMember(String tenantId, String userId, String role) throws Exception {
+        try (var c = java.sql.DriverManager.getConnection(postgres.getJdbcUrl(), "agendai_owner", "owner-test");
+             var st = c.prepareStatement("INSERT INTO memberships (tenant_id, user_id, role, joined_at) VALUES (?, ?, ?, now())")) {
+            st.setObject(1, UUID.fromString(tenantId));
+            st.setObject(2, UUID.fromString(userId));
+            st.setString(3, role);
+            st.executeUpdate();
+        }
+    }
+
     protected Session register() throws Exception {
         return register("Ana Souza", email(), "Barbearia da Ana");
     }

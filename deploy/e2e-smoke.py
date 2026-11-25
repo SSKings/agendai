@@ -96,6 +96,18 @@ def main():
     check("outro dono recebe 404 no estabelecimento da Ana (nem sabe que existe)", s == 404, s)
     check("sem token: 401", call("GET", "/api/me")[0] == 401)
 
+    # ---- catálogo (fase 1): dono cadastra; outro estabelecimento não vê nem usa ----
+    base = f"/api/tenants/{tenant['id']}"
+    s, svc, _ = call("POST", base + "/services", ana["accessToken"],
+                     {"name": "Corte", "durationMinutes": 30, "bufferMinutes": 5, "priceCents": 4500, "active": True})
+    check("dono cadastra serviço", s == 201 and svc["priceCents"] == 4500, svc)
+    s, pro, _ = call("POST", base + "/professionals", ana["accessToken"], {"name": "João", "active": True, "serviceIds": [svc["id"]]})
+    check("dono cadastra profissional com o serviço", s == 201 and pro["serviceIds"] == [svc["id"]], pro)
+    check("outro dono não lista os serviços da Ana", call("GET", base + "/services", eve["accessToken"])[0] == 404)
+    s, _, _ = call("POST", f"/api/tenants/{call('GET', '/api/me', eve['accessToken'])[1]['tenants'][0]['id']}/professionals",
+                   eve["accessToken"], {"name": "Intruso", "active": True, "serviceIds": [svc["id"]]})
+    check("serviço da Ana não pode ser ligado a profissional da Eve", s == 400, s)
+
     # ---- refresh: anti-CSRF, rotação e reuso ----
     check("refresh sem o cabeçalho anti-CSRF: 403", refresh(cookie, csrf=False)[0] == 403)
     s, b, h = refresh(cookie)

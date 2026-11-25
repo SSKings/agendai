@@ -72,8 +72,9 @@ public class BookingService {
 
     @Transactional
     public BookingView create(UUID tenantId, BookingRequest r) {
-        access.member(tenantId);
+        CatalogService.Actor actor = catalog.actor(tenantId, access.member(tenantId));
         CatalogService.Offer offer = catalog.offer(tenantId, r.professionalId(), r.serviceId());
+        actor.requireFor(r.professionalId());          // profissional da equipe: só na própria agenda
         if (!offer.bookable()) throw ApiException.conflict(INACTIVE);
         LocalDateTime local = r.start();
         if (local.getMinute() % 5 != 0 || local.getSecond() != 0 || local.getNano() != 0) throw ApiException.badRequest(FIVE_MINUTE_STEPS);
@@ -104,7 +105,15 @@ public class BookingService {
         } catch (DataIntegrityViolationException e) {
             throw translate(e);
         }
-        return view(b, customer, zone, false);
+        BookingView view = view(b, customer, zone, false);
+        // profissional da equipe: o e-mail de um cliente que já existia não volta para ele (pode ser de outro profissional)
+        return actor.owner() ? view : withEmail(view, r.customer().email());
+    }
+
+    private static BookingView withEmail(BookingView v, String email) {
+        CustomerView c = v.customer();
+        return new BookingView(v.id(), v.professionalId(), v.serviceId(), new CustomerView(c.id(), c.name(), c.phone(), email),
+                v.start(), v.end(), v.status(), v.priceCents(), v.note(), v.outsideHours());
     }
 
     /** Violação da restrição de exclusão = alguém agendou antes (409 claro); qualquer outra segue como erro de dados. */
@@ -134,7 +143,12 @@ public class BookingService {
     /** Agenda de {@code from} a {@code to} (dias do fuso do estabelecimento, até 7), de todos ou de um profissional. */
     @Transactional(readOnly = true)
     public AgendaView agenda(UUID tenantId, LocalDate from, LocalDate to, UUID professionalId) {
-        access.member(tenantId);
+        CatalogService.Actor actor = catalog.actor(tenantId, access.member(tenantId));
+        // profissional da equipe: sem filtro, a própria agenda; filtrar por outro é 403 (dados de clientes alheios)
+        if (!actor.owner()) {
+            if (professionalId == null) professionalId = actor.own();
+            else actor.requireFor(professionalId);
+        }
         long days = ChronoUnit.DAYS.between(from, to);
         if (days < 0 || days >= MAX_AGENDA_DAYS) throw ApiException.badRequest(INVALID_PERIOD);
         ZoneId zone = tenants.zoneOf(tenantId);
@@ -155,8 +169,9 @@ public class BookingService {
 
     @Transactional
     public BookingView changeStatus(UUID tenantId, UUID id, StatusRequest r) {
-        access.member(tenantId);
+        CatalogService.Actor actor = catalog.actor(tenantId, access.member(tenantId));
         Booking b = bookings.findByIdAndTenantId(id, tenantId).orElseThrow(() -> ApiException.notFound(NOT_FOUND));
+        actor.requireFor(b.getProfessionalId());
         Instant now = clock.instant();
         if (b.getStatus() != BookingStatus.CONFIRMED || r.status() == BookingStatus.CONFIRMED) throw ApiException.conflict(INVALID_STATUS);
         if (r.status() != BookingStatus.CANCELLED && now.isBefore(b.getStartsAt())) throw ApiException.conflict(NOT_STARTED);

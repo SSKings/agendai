@@ -2,6 +2,8 @@ import type { ReactNode } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider, useAuth, type Status } from './auth/AuthContext'
 import { Layout } from './components/Layout'
+import { pendingInvite } from './lib/pendingInvite'
+import { AcceptInvitePage } from './pages/AcceptInvitePage'
 import { AccountPage } from './pages/AccountPage'
 import { AgendaPage } from './pages/AgendaPage'
 import { AvailabilityPage } from './pages/AvailabilityPage'
@@ -18,7 +20,8 @@ import { TimeOffPage } from './pages/TimeOffPage'
 function Gate({ need, children }: { need: Exclude<Status, 'loading'>; children: ReactNode }) {
   const { status } = useAuth()
   if (status === 'loading') return <p className="p-6 text-center text-slate-500">Carregando…</p>
-  if (status !== need) return <Navigate to={need === 'in' ? '/entrar' : '/'} replace />
+  // depois de entrar ou criar a conta, um convite aberto antes volta para ser aceito
+  if (status !== need) return <Navigate to={need === 'in' ? '/entrar' : pendingInvite() ? '/convite' : '/'} replace />
   return children
 }
 
@@ -28,6 +31,7 @@ export function App() {
       <Routes>
         <Route path="/entrar" element={<Gate need="out"><LoginPage /></Gate>} />
         <Route path="/cadastro" element={<Gate need="out"><RegisterPage /></Gate>} />
+        <Route path="/convite" element={<AcceptInvitePage />} />
         <Route element={<Gate need="in"><Layout /></Gate>}>
           <Route index element={<HomePage />} />
           <Route path="conta" element={<AccountPage />} />

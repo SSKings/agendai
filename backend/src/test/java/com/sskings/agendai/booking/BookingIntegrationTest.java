@@ -358,9 +358,9 @@ class BookingIntegrationTest extends IntegrationTest {
         String evesBooking = body(book(eve, eve.joao(), MONDAY + "T09:00")).get("id").asString();
         Session bia = register("Bia", email(), "Outro");
         addMember(s.owner().tenantId(), bia.userId(), "PROFESSIONAL");
-        MockHttpServletResponse byTeam = call(post(s.base() + "/bookings"), bia.token(), booking(s.joao(), s.corte(), MONDAY + "T09:00", "11987654321"));
-        assertThat(byTeam.getStatus()).isEqualTo(201);
-        assertThat(body(call(get(s.base() + "/bookings").param("from", MONDAY).param("to", MONDAY), bia.token(), null)).get("bookings")).hasSize(1);
+        // na equipe mas sem vínculo com um profissional (sem convite): não age na agenda de ninguém (InviteIntegrationTest)
+        assertThat(call(post(s.base() + "/bookings"), bia.token(), booking(s.joao(), s.corte(), MONDAY + "T09:00", "11987654321")).getStatus())
+                .isEqualTo(403);
 
         assertError(call(patch(s.base() + "/bookings/" + evesBooking), s.owner().token(), Map.of("status", "CANCELLED")), 404, BookingService.NOT_FOUND);
         assertError(call(post(s.base() + "/bookings"), s.owner().token(), booking(eve.joao(), s.corte(), MONDAY + "T10:00", "11987654321")),

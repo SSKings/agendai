@@ -9,8 +9,8 @@ import { renderApp } from './test/render'
 
 const T = '/api/tenants/t1'
 const CORTE: ServiceView = { id: 's1', name: 'Corte', durationMinutes: 30, bufferMinutes: 10, priceCents: 4500, active: true }
-const JOAO: ProfessionalView = { id: 'p1', name: 'João', active: true, serviceIds: ['s1'] }
-const BETO: ProfessionalView = { id: 'p2', name: 'Beto', active: true, serviceIds: ['s1'] }
+const JOAO: ProfessionalView = { id: 'p1', name: 'João', active: true, serviceIds: ['s1'], hasAccount: false, self: false }
+const BETO: ProfessionalView = { id: 'p2', name: 'Beto', active: true, serviceIds: ['s1'], hasAccount: false, self: false }
 // relógio fixo (só a data): nada depende de rodar perto da meia-noite em São Paulo
 beforeAll(() => {
   vi.useFakeTimers({ toFake: ['Date'] })

@@ -66,6 +66,14 @@ class ArchitectureTest {
     }
 
     @Test
+    @DisplayName("O estabelecimento (tenant) não depende do catálogo: por isso o convite mora no catálogo (ADR-010)")
+    void tenantDoesNotDependOnCatalog() {
+        noClasses().that().resideInAPackage("..tenant..")
+                .should().dependOnClassesThat().resideInAPackage("..catalog..")
+                .check(APP);
+    }
+
+    @Test
     @DisplayName("Repositório de usuários só é usado pelos módulos de usuário, autenticação e segurança")
     void userRepositoryUsage() {
         classes().that().areAssignableTo(Repository.class).and().resideInAPackage("..user..")

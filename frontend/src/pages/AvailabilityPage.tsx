@@ -24,7 +24,8 @@ export function AvailabilityPage() {
   const [services, professionals] = data ?? [[], []]
   const offered = services.filter((s) => s.active)
   const service = serviceId || offered[0]?.id
-  const team = professionals.filter((p) => p.active && p.serviceIds.includes(service))
+  // profissional da equipe agenda só para si mesmo
+  const team = professionals.filter((p) => p.active && p.serviceIds.includes(service) && (tenant.role === 'OWNER' || p.self))
   const professional = team.some((p) => p.id === professionalId) ? professionalId : team[0]?.id
 
   const search = async () => {

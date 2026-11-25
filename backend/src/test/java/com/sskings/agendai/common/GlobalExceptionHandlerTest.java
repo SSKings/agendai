@@ -36,4 +36,16 @@ class GlobalExceptionHandlerTest {
         assertThat(r.getStatusCode().value()).isEqualTo(400);
         assertThat(r.getBody().message()).isEqualTo("Validation failed");
     }
+
+    @org.junit.jupiter.api.Test
+    @org.junit.jupiter.api.DisplayName("Trava ou pool esgotado: 503 'tente de novo', sem detalhe interno")
+    void busy() {
+        for (Exception e : new Exception[]{new org.springframework.transaction.CannotCreateTransactionException("pool HikariPool-1"),
+                new jakarta.persistence.LockTimeoutException("lock"), new org.springframework.dao.CannotAcquireLockException("55P03")}) {
+            var r = handler.busy(e);
+            assertThat(r.getStatusCode().value()).isEqualTo(503);
+            assertThat(r.getBody().message()).isEqualTo("Busy, try again");
+            assertThat(r.getBody().toString()).doesNotContain("Hikari", "55P03");
+        }
+    }
 }

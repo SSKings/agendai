@@ -1,6 +1,24 @@
 {
   "components" : {
     "schemas" : {
+      "AcceptRequest" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "AcceptedView" : {
+        "properties" : {
+          "tenantId" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        },
+        "required" : [ "tenantId" ],
+        "type" : "object"
+      },
       "AgendaView" : {
         "properties" : {
           "bookings" : {
@@ -178,6 +196,19 @@
         "required" : [ "id", "name", "phone" ],
         "type" : "object"
       },
+      "InviteView" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "expiresAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        },
+        "required" : [ "code", "expiresAt" ],
+        "type" : "object"
+      },
       "LoginRequest" : {
         "properties" : {
           "email" : {
@@ -245,12 +276,18 @@
           "active" : {
             "type" : "boolean"
           },
+          "hasAccount" : {
+            "type" : "boolean"
+          },
           "id" : {
             "format" : "uuid",
             "type" : "string"
           },
           "name" : {
             "type" : "string"
+          },
+          "self" : {
+            "type" : "boolean"
           },
           "serviceIds" : {
             "items" : {
@@ -260,7 +297,7 @@
             "type" : "array"
           }
         },
-        "required" : [ "active", "id", "name", "serviceIds" ],
+        "required" : [ "active", "hasAccount", "id", "name", "self", "serviceIds" ],
         "type" : "object"
       },
       "RegisterRequest" : {
@@ -608,6 +645,34 @@
         "tags" : [ "auth-controller" ]
       }
     },
+    "/api/invites/accept" : {
+      "post" : {
+        "operationId" : "accept",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AcceptRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AcceptedView"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "invite-controller" ]
+      }
+    },
     "/api/me" : {
       "get" : {
         "operationId" : "me",
@@ -783,7 +848,7 @@
         "tags" : [ "booking-controller" ]
       },
       "post" : {
-        "operationId" : "create",
+        "operationId" : "create_1",
         "parameters" : [ {
           "in" : "path",
           "name" : "tenantId",
@@ -971,6 +1036,95 @@
           }
         },
         "tags" : [ "catalog-controller" ]
+      }
+    },
+    "/api/tenants/{tenantId}/professionals/{professionalId}/account" : {
+      "delete" : {
+        "operationId" : "removeAccount",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "tenantId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "professionalId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "No Content"
+          }
+        },
+        "tags" : [ "invite-controller" ]
+      }
+    },
+    "/api/tenants/{tenantId}/professionals/{professionalId}/invite" : {
+      "delete" : {
+        "operationId" : "revoke",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "tenantId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "professionalId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "No Content"
+          }
+        },
+        "tags" : [ "invite-controller" ]
+      },
+      "post" : {
+        "operationId" : "create",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "tenantId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "professionalId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/InviteView"
+                }
+              }
+            },
+            "description" : "Created"
+          }
+        },
+        "tags" : [ "invite-controller" ]
       }
     },
     "/api/tenants/{tenantId}/professionals/{professionalId}/working-hours" : {

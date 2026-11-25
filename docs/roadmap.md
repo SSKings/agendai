@@ -42,7 +42,7 @@ API não sobe com configuração insegura.
 
 Em quatro PRs: **1a** catálogo e equipe (serviços, profissionais, quem faz o quê) — PR #6; **1b** expediente, bloqueios
 e horários livres — PR #7; **1c** agendamento sem conflito (restrição de exclusão no banco, agendamento manual pelos
-horários livres, agenda do dia/semana, atendido/falta/cancelado); **1d** convite para a equipe (vínculo de um
+horários livres, agenda do dia/semana, atendido/falta/cancelado) — PR #8; **1d** convite para a equipe (vínculo de um
 profissional a uma conta), que também restringe o profissional à própria agenda.
 
 - Serviços (duração, preço, preparo), profissionais, quem faz o quê, convite para a equipe.

@@ -20,7 +20,12 @@ hora que deixam a cadeira vazia.
 
 - Cadastro do estabelecimento: nome, link público (slug), fuso horário, endereço, contato.
 - **Serviços:** nome, duração (múltiplos de 5 min), preço, intervalo de preparo após o atendimento, ativo/inativo.
-- **Profissionais:** quem faz quais serviços; convite por link de uso único para entrar na equipe.
+- **Profissionais:** quem faz quais serviços; convite por link de uso único (72 h) para entrar na equipe: quem aceita,
+  com a própria conta, vira profissional do estabelecimento vinculado àquele profissional. O profissional da equipe vê
+  e mexe só na própria agenda (agendamentos, status, folgas e almoço); expediente, catálogo, feriados e convites são do
+  dono, que também tira da equipe quem saiu (o profissional e os agendamentos ficam; o acesso, não). Limitação atual:
+  quem não tem conta cria uma pelo cadastro, que também cria um estabelecimento próprio (cadastro só de profissional
+  fica para depois).
 - Limites por estabelecimento: até 100 serviços e 50 profissionais (cobre com folga o público-alvo; evita listas sem
   limite).
 - **Expediente:** horários por dia da semana e por profissional (mais de uma faixa no dia = pausa, ex.: almoço; até

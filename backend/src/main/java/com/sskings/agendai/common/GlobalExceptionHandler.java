@@ -73,11 +73,11 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * lock_timeout estourou (application.yml): o recurso está ocupado agora; o cliente pode tentar de novo. Vem
-     * traduzida pelo Spring (repositórios) ou crua do JPA (consulta nativa, ex.: a trava do estabelecimento).
+     * lock_timeout estourou ou o pool não teve conexão a tempo (application.yml): ocupado agora; o cliente pode tentar
+     * de novo. A trava vem traduzida pelo Spring (repositórios) ou crua do JPA (consulta nativa).
      */
     @ExceptionHandler({PessimisticLockingFailureException.class, jakarta.persistence.PessimisticLockException.class,
-            jakarta.persistence.LockTimeoutException.class})
+            jakarta.persistence.LockTimeoutException.class, org.springframework.transaction.CannotCreateTransactionException.class})
     ResponseEntity<ErrorResponse> busy(Exception ex) {
         log.warn("Espera por trava excedida: {}", ex.getClass().getSimpleName());
         return error(HttpStatus.SERVICE_UNAVAILABLE, "Busy, try again");

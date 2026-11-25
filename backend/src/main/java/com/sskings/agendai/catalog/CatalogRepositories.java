@@ -38,6 +38,10 @@ interface ProfessionalRepository extends JpaRepository<Professional, UUID> {
     boolean nameTaken(@Param("tenant") UUID tenantId, @Param("name") String name, @Param("except") UUID except);
 
     long countByTenantId(UUID tenantId);
+
+    /** Profissional ATIVO vinculado à conta: desativado, a conta deixa de agir pela agenda dele. */
+    @Query("select p.id from Professional p where p.tenantId = :tenant and p.userId = :user and p.active = true")
+    Optional<UUID> idOfUser(@Param("tenant") UUID tenantId, @Param("user") UUID userId);
 }
 
 interface ProfessionalServiceRepository extends JpaRepository<ProfessionalService, ProfessionalService.Link> {

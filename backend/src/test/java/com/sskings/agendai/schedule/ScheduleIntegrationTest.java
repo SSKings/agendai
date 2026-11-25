@@ -303,8 +303,8 @@ class ScheduleIntegrationTest extends IntegrationTest {
         assertThat(seenByTeam.get(1).get("reason").isNull()).as("o motivo pode ser pessoal: só o dono vê").isTrue();
         assertThat(body(call(get(base(ana) + "/time-off").param("from", "2026-12-01").param("to", "2026-12-01"), ana.token(), null))
                 .get(1).get("reason").asString()).isEqualTo("Exame médico");
-        assertError(call(post(base(ana) + "/time-off"), bia.token(), timeOff(null, "2026-12-03T00:00", "2026-12-04T00:00", null)), 403, "Only owners can do this");
-        assertError(call(delete(base(ana) + "/time-off/" + own), bia.token(), null), 403, "Only owners can do this");
+        assertError(call(post(base(ana) + "/time-off"), bia.token(), timeOff(null, "2026-12-03T00:00", "2026-12-04T00:00", null)), 403, "Only your own agenda");
+        assertError(call(delete(base(ana) + "/time-off/" + own), bia.token(), null), 403, "Only your own agenda");
         assertError(call(get(base(eve) + "/time-off").param("from", "2026-12-01").param("to", "2026-12-01"), ana.token(), null), 404, "Tenant not found");
     }
 

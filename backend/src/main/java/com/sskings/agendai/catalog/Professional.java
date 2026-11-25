@@ -39,6 +39,10 @@ class Professional implements Persistable<UUID> {
     @Column(nullable = false)
     private boolean active;
 
+    /** Conta vinculada pelo convite (só o banco grava: função redeem_invite, V5). */
+    @Column(name = "user_id", insertable = false, updatable = false)
+    private UUID userId;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

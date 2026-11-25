@@ -34,10 +34,18 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         if (header != null && header.startsWith("Bearer ")) {
             JwtService.Claims claims = jwt.validate(header.substring(7).trim());
             if (claims != null) {
-                users.findById(claims.userId())
-                        .filter(u -> u.getTokenVersion() == claims.version())
-                        .ifPresent(u -> SecurityContextHolder.getContext().setAuthentication(
-                                new UsernamePasswordAuthenticationToken(u, null, List.of(new SimpleGrantedAuthority("ROLE_USER")))));
+                try {
+                    users.findById(claims.userId())
+                            .filter(u -> u.getTokenVersion() == claims.version())
+                            .ifPresent(u -> SecurityContextHolder.getContext().setAuthentication(
+                                    new UsernamePasswordAuthenticationToken(u, null, List.of(new SimpleGrantedAuthority("ROLE_USER")))));
+                } catch (org.springframework.transaction.CannotCreateTransactionException e) {
+                    // pool sem conexão a tempo: aqui é filtro (o GlobalExceptionHandler não alcança) — 503, não 500
+                    response.setStatus(503);
+                    response.setContentType("application/json");
+                    response.getWriter().write("{\"status\":503,\"message\":\"Busy, try again\",\"errors\":null}");
+                    return;
+                }
             }
         }
         chain.doFilter(request, response);

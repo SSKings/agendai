@@ -24,6 +24,8 @@ export function TimeOffPage() {
   const [removeError, setRemoveError] = useState<string | null>(null)
   const [list, professionals] = data ?? [null, []]
   const nameOf = new Map(professionals.map((p) => [p.id, p.name]))
+  // profissional da equipe: bloqueia e remove só os próprios (folga, almoço)
+  const mine = professionals.find((p) => p.self)
 
   const remove = async (id: string) => {
     try {
@@ -38,7 +40,9 @@ export function TimeOffPage() {
   return (
     <div className="space-y-4">
       <h2 className="text-lg font-semibold text-slate-900">Bloqueios e feriados</h2>
-      {owner && <TimeOffForm tenantId={tenant.id} professionals={professionals} onDone={reload} />}
+      {(owner || mine) && (
+        <TimeOffForm tenantId={tenant.id} professionals={owner ? professionals : [mine!]} whole={owner} onDone={reload} />
+      )}
       {error && <Alert>{error}</Alert>}
       {removeError && <Alert>{removeError}</Alert>}
       {list?.length === 0 && <p className="text-slate-500">Nenhum bloqueio nos próximos 3 meses.</p>}
@@ -52,7 +56,9 @@ export function TimeOffPage() {
                 {t.reason ? ` · ${t.reason}` : ''}
               </p>
             </div>
-            {owner && <Button aria-label={`Remover bloqueio de ${formatLocal(t.start)}`} onClick={() => void remove(t.id)}>Remover</Button>}
+            {(owner || (mine && t.professionalId === mine.id)) && (
+              <Button aria-label={`Remover bloqueio de ${formatLocal(t.start)}`} onClick={() => void remove(t.id)}>Remover</Button>
+            )}
           </li>
         ))}
       </ul>
@@ -60,12 +66,14 @@ export function TimeOffPage() {
   )
 }
 
-function TimeOffForm({ tenantId, professionals, onDone }: {
+function TimeOffForm({ tenantId, professionals, whole, onDone }: {
   tenantId: string
   professionals: ProfessionalView[]
+  /** pode bloquear o estabelecimento inteiro (só o dono) */
+  whole: boolean
   onDone: () => Promise<void>
 }) {
-  const [professionalId, setProfessionalId] = useState('')
+  const [professionalId, setProfessionalId] = useState(whole ? '' : professionals[0].id)
   const [start, setStart] = useState('')
   const [end, setEnd] = useState('')
   const [reason, setReason] = useState('')
@@ -81,7 +89,7 @@ function TimeOffForm({ tenantId, professionals, onDone }: {
     <form onSubmit={onSubmit} className="space-y-3 rounded-xl bg-white p-4 ring-1 ring-slate-200">
       <h3 className="font-semibold text-slate-900">Novo bloqueio</h3>
       <ProfessionalPicker professionals={professionals} value={professionalId} onChange={setProfessionalId}
-        label="Quem" extra="Todo o estabelecimento (feriado)" />
+        label="Quem" extra={whole ? 'Todo o estabelecimento (feriado)' : undefined} />
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Início" type="datetime-local" step={300} required value={start} onChange={(e) => setStart(e.target.value)} />
         <Field label="Fim" type="datetime-local" step={300} required value={end} onChange={(e) => setEnd(e.target.value)} />

@@ -22,7 +22,8 @@ export function mockApi(routes: Record<string, Handler>) {
     calls.push(call)
     const h = routes[`${call.method} ${call.path}`]
     if (h === undefined) return new Response(JSON.stringify({ status: 404, message: 'Resource not found' }), { status: 404 })
-    const out = typeof h === 'function' ? (h as (b: unknown, c: Call) => Reply)(call.body, call) : h
+    // a resposta pode ser uma Promise: o teste segura a requisição "em andamento" e solta quando quiser
+    const out = typeof h === 'function' ? await (h as (b: unknown, c: Call) => Reply | Promise<Reply>)(call.body, call) : h
     const [status, payload] = Array.isArray(out) && typeof out[0] === 'number' ? (out as [number, unknown?]) : [200, out]
     return new Response(status === 204 || payload === undefined ? null : JSON.stringify(payload), {
       status,

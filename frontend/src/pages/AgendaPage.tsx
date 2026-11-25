@@ -58,7 +58,10 @@ export function AgendaPage() {
             <option value="week">Semana</option>
           </select>
         </div>
-        <ProfessionalPicker professionals={professionals} value={professionalId} onChange={setProfessionalId} extra="Todos" />
+        {/* profissional da equipe vê só a própria agenda (a API garante; aqui nem oferece filtro) */}
+        {tenant.role === 'OWNER' && (
+          <ProfessionalPicker professionals={professionals} value={professionalId} onChange={setProfessionalId} extra="Todos" />
+        )}
       </div>
       {error && <Alert>{error}</Alert>}
       {actionError && <Alert>{actionError}</Alert>}

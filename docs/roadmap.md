@@ -40,7 +40,7 @@ API não sobe com configuração insegura.
 
 ## Fase 1 — Agenda
 
-Em três PRs: **1a** catálogo e equipe (serviços, profissionais, quem faz o quê) — PR #2; **1b** expediente, bloqueios e
+Em três PRs: **1a** catálogo e equipe (serviços, profissionais, quem faz o quê) — PR #6; **1b** expediente, bloqueios e
 horários livres; **1c** agendamento sem conflito e agenda do dia/semana. O convite para a equipe (vínculo de um
 profissional a uma conta) entra junto com a 1c.
 

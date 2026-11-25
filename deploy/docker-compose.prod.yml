@@ -39,7 +39,7 @@ services:
 
   redis:
     logging: *logging
-    image: redis:7.4-alpine@sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe
+    build: ./redis              # imagem oficial fixada por digest + apk upgrade (redis/Dockerfile)
     restart: unless-stopped
     user: "999:1000"          # usuário redis da imagem: sem passar pelo root do entrypoint
     # dados temporários (contadores com validade): sem gravação em disco; memória limitada, descarta os que vencem antes

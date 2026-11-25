@@ -12,7 +12,7 @@ updates:
     groups: { npm-minor-patch: { update-types: [minor, patch] } }
     ignore: [{ dependency-name: "*", update-types: ["version-update:semver-major"] }]
   - package-ecosystem: docker
-    directories: [/backend, /frontend]
+    directories: [/backend, /frontend, /deploy/redis]
     schedule: { interval: weekly }
     groups: { docker-minor-patch: { update-types: [minor, patch] } }
     ignore: [{ dependency-name: "*", update-types: ["version-update:semver-major"] }]

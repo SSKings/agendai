@@ -134,6 +134,19 @@ def main():
     check("aparece na agenda do dia", s == 200 and [b["id"] for b in ag["bookings"]] == [bk["id"]], ag)
     s, _, _ = call("PATCH", f"{base}/bookings/{bk['id']}", ana["accessToken"], {"status": "CANCELLED"})
     check("cancelar libera o horário", s == 200 and call("POST", base + "/bookings", ana["accessToken"], req)[0] == 201, s)
+    # ---- página pública (fase 2a): sem login, só o que o cliente precisa ver ----
+    pub = f"/api/public/{tenant['slug']}"
+    s, info, _ = call("GET", pub)
+    check("página pública sem login: nome do estabelecimento", s == 200 and info["name"] == "Barbearia da Ana", info)
+    s, svcs, _ = call("GET", pub + "/services")
+    check("serviços públicos sem dado interno (preparo)", s == 200 and svcs and "bufferMinutes" not in svcs[0], svcs)
+    q = f"availability?professionalId={pro['id']}&serviceId={svc['id']}&date={day}"
+    panel = call("GET", f"{base}/{q}", ana["accessToken"])[1]
+    s, pav, _ = call("GET", f"{pub}/{q}")
+    check("horários livres públicos iguais aos do painel, sem dados de clientes", s == 200 and pav == panel
+          and "Cliente" not in json.dumps(pav), pav)
+    check("link inexistente: 404", call("GET", "/api/public/nao-existe-mesmo")[0] == 404)
+
     # ---- convite (fase 1d): o profissional entra com a própria conta e só vê a própria agenda ----
     s, inv, _ = call("POST", f"{base}/professionals/{pro['id']}/invite", ana["accessToken"])
     check("dono gera convite (código de 43 caracteres)", s == 201 and len(inv["code"]) == 43, s)

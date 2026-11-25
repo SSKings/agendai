@@ -56,6 +56,10 @@ local; expediente alterado não apaga agendamentos. **Desempenho:** agenda da se
 
 ## Fase 2 — Agendamento público
 
+Em três PRs: **2a** página pública por link, só leitura (serviço → profissional → dia → horários livres), com limite
+por IP próprio; **2b** reserva temporária no Redis e confirmação por código no e-mail; **2c** link pessoal para cancelar
+ou remarcar, política do estabelecimento e LGPD.
+
 - Página pública por slug, fluxo serviço → profissional → dia → horário.
 - Reserva temporária de 5 min no Redis; confirmação por código no e-mail.
 - Link pessoal para cancelar ou remarcar dentro da política.

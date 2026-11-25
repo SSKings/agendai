@@ -104,7 +104,7 @@ class ProductionConfigValidatorTest {
 
     private static AgendaiProperties props(String secret, List<String> origins, boolean secureCookie) {
         return new AgendaiProperties(new AgendaiProperties.Jwt(secret, 15), new AgendaiProperties.Refresh(30, secureCookie),
-                new AgendaiProperties.Login(5, 15), new AgendaiProperties.RateLimit(20), 65536, new AgendaiProperties.Cors(origins));
+                new AgendaiProperties.Login(5, 15), new AgendaiProperties.RateLimit(20, 120, 1200), 65536, new AgendaiProperties.Cors(origins));
     }
 
     @Test

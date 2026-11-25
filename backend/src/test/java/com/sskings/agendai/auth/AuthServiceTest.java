@@ -33,7 +33,7 @@ class AuthServiceTest {
         PasswordEncoder encoder = mock(PasswordEncoder.class);
         when(encoder.encode(any())).thenReturn("hash");
         AgendaiProperties props = new AgendaiProperties(new AgendaiProperties.Jwt("x".repeat(64), 15),
-                new AgendaiProperties.Refresh(30, true), new AgendaiProperties.Login(5, 15), new AgendaiProperties.RateLimit(20),
+                new AgendaiProperties.Refresh(30, true), new AgendaiProperties.Login(5, 15), new AgendaiProperties.RateLimit(20, 120, 1200),
                 65536, new AgendaiProperties.Cors(List.of()));
         service = new AuthService(users, encoder, mock(JwtService.class), refreshTokens, mock(TenantService.class), props, new MutableClock());
     }

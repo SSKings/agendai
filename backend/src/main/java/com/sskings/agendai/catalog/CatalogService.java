@@ -142,6 +142,27 @@ public class CatalogService {
                 CurrentUser.id().map(id -> id.equals(p.getUserId())).orElse(false));
     }
 
+    // ---------- página pública (só o que o cliente precisa ver; nada da equipe nem de clientes) ----------
+
+    public record PublicService(UUID id, String name, int durationMinutes, int priceCents) {}
+
+    public record PublicProfessional(UUID id, String name) {}
+
+    /** Serviços ativos, dentro de uma transação que já passou pelo guard público. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public List<PublicService> activeServices(UUID tenantId) {
+        return services.listOf(tenantId).stream().filter(Service::isActive)
+                .map(s -> new PublicService(s.getId(), s.getName(), s.getDurationMinutes(), s.getPriceCents())).toList();
+    }
+
+    /** Quem faz um serviço ativo (404 se o serviço não existe ou está inativo: na página pública, tanto faz). */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public List<PublicProfessional> activeProfessionalsFor(UUID tenantId, UUID serviceId) {
+        services.findByIdAndTenantId(serviceId, tenantId).filter(Service::isActive)
+                .orElseThrow(() -> ApiException.notFound("Service not found"));
+        return professionals.activeFor(tenantId, serviceId).stream().map(p -> new PublicProfessional(p.getId(), p.getName())).toList();
+    }
+
     // ---------- para outros módulos (agenda) ----------
 
     /** O que a agenda precisa de um serviço feito por um profissional; {@code bookable}: os dois estão ativos. */

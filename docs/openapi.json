@@ -137,6 +137,18 @@
         "required" : [ "customer", "end", "id", "outsideHours", "priceCents", "professionalId", "serviceId", "start", "status" ],
         "type" : "object"
       },
+      "BusinessView" : {
+        "properties" : {
+          "name" : {
+            "type" : "string"
+          },
+          "timeZone" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "name", "timeZone" ],
+        "type" : "object"
+      },
       "ChangePasswordRequest" : {
         "properties" : {
           "currentPassword" : {
@@ -298,6 +310,40 @@
           }
         },
         "required" : [ "active", "hasAccount", "id", "name", "self", "serviceIds" ],
+        "type" : "object"
+      },
+      "PublicProfessional" : {
+        "properties" : {
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "id", "name" ],
+        "type" : "object"
+      },
+      "PublicService" : {
+        "properties" : {
+          "durationMinutes" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "priceCents" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "durationMinutes", "id", "name", "priceCents" ],
         "type" : "object"
       },
       "RegisterRequest" : {
@@ -717,6 +763,148 @@
           }
         },
         "tags" : [ "auth-controller" ]
+      }
+    },
+    "/api/public/{slug}" : {
+      "get" : {
+        "operationId" : "business",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "slug",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/BusinessView"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "public-booking-controller" ]
+      }
+    },
+    "/api/public/{slug}/availability" : {
+      "get" : {
+        "operationId" : "availability_1",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "slug",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "professionalId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "serviceId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "date",
+          "required" : true,
+          "schema" : {
+            "format" : "date",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AvailabilityView"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "public-booking-controller" ]
+      }
+    },
+    "/api/public/{slug}/services" : {
+      "get" : {
+        "operationId" : "services_1",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "slug",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/PublicService"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "public-booking-controller" ]
+      }
+    },
+    "/api/public/{slug}/services/{serviceId}/professionals" : {
+      "get" : {
+        "operationId" : "professionals_1",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "slug",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "serviceId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/PublicProfessional"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "public-booking-controller" ]
       }
     },
     "/api/tenants/{id}" : {

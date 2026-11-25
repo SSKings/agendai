@@ -69,12 +69,16 @@ public class SecurityConfig {
                 .authorizeHttpRequests(a -> {
                     a.requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login", "/api/auth/refresh").permitAll()
                      .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
+                     // página pública do estabelecimento (só leitura nesta etapa): guard próprio por link (PublicAccess)
+                     .requestMatchers(HttpMethod.GET, "/api/public/**").permitAll()
                      .requestMatchers("/error").permitAll();
                     if (docs) a.requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll();
                     a.anyRequest().authenticated();
                 })
                 .addFilterBefore(new RequestSizeLimitFilter(props.maxRequestBytes()), UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(new RateLimitFilter(props.rateLimit().authPerMinute(), redis, clock), UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(RateLimitFilter.forPublicPages(props.rateLimit().publicPerMinute(), props.rateLimit().publicPerBusinessMinute(), redis, clock),
+                        UsernamePasswordAuthenticationFilter.class)
                 // criado aqui (e não como @Bean): só roda dentro da cadeia de segurança, nunca registrado de novo no
                 // servidor como filtro solto — o que também o executaria antes de o banco estar pronto
                 .addFilterBefore(new JwtAuthFilter(jwt, users), UsernamePasswordAuthenticationFilter.class)

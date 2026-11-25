@@ -85,6 +85,8 @@ agendai:
     lock-minutes: 15             # dobra a cada bloqueio seguido (15, 30, 60…), até 24 h
   rate-limit:
     auth-per-minute: ${AUTH_RATE_LIMIT_PER_MINUTE:20}   # por IP, no Redis (vale entre instâncias)
+    public-per-minute: ${PUBLIC_RATE_LIMIT_PER_MINUTE:120}   # página pública: uma pessoa navegando nunca chega perto
+    public-per-business-minute: ${PUBLIC_RATE_LIMIT_PER_BUSINESS_MINUTE:1200}   # todas as origens somadas, por estabelecimento
   max-request-bytes: 65536       # a API só recebe JSON pequeno
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:}

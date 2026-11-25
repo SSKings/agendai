@@ -14,6 +14,7 @@ const MESSAGES: Record<string, string> = {
   'Invalid session': 'Sua sessão terminou. Entre de novo.',
   'Validation failed': 'Confira os campos.',
   'Tenant not found': 'Estabelecimento não encontrado.',
+  'Business not found': 'Estabelecimento não encontrado. Confira o link.',
   'Request body too large': 'Os dados enviados são grandes demais.',
   'Only owners can do this': 'Só o dono do estabelecimento pode fazer isso.',
   'Service not found': 'Serviço não encontrado.',

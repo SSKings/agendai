@@ -17,7 +17,7 @@ describe('sessão ao abrir o app', () => {
     expect(await screen.findByRole('heading', { name: 'Olá, Ana!' })).toBeInTheDocument()
     const cards = screen.getAllByRole('listitem')
     expect(within(cards[0]).getByText('Barbearia da Ana')).toBeInTheDocument()
-    expect(within(cards[0]).getByText('agendai.app/barbearia-da-ana')).toBeInTheDocument()
+    expect(within(cards[0]).getByText('Página pública: /agendar/barbearia-da-ana')).toBeInTheDocument()
     expect(within(cards[0]).getByText('Dono')).toBeInTheDocument()
     expect(within(cards[1]).getByText('Profissional')).toBeInTheDocument()
     expect(m.last('GET', '/api/me')!.headers.Authorization).toBe('Bearer tok')

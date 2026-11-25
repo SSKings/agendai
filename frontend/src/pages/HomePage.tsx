@@ -14,7 +14,7 @@ export function HomePage() {
         {me?.tenants.map((t) => (
           <li key={t.id} className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
             <Link to={`/e/${t.id}/agenda`} className="font-semibold text-slate-900 hover:text-indigo-600">{t.name}</Link>
-            <p className="text-sm text-slate-500">agendai.app/{t.slug}</p>
+            <Link to={`/agendar/${t.slug}`} className="text-sm text-slate-500 hover:text-indigo-600">Página pública: /agendar/{t.slug}</Link>
             <p className="mt-2 inline-block rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">{ROLE[t.role]}</p>
           </li>
         ))}

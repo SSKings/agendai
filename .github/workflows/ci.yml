@@ -55,9 +55,9 @@ jobs:
             classes: com.sskings.agendai.security.*,com.sskings.agendai.auth.*,com.sskings.agendai.config.ProductionConfigValidator*
             tests: com.sskings.agendai.security.*Test,com.sskings.agendai.auth.*Test,com.sskings.agendai.config.ProductionConfigValidatorTest
           - area: catálogo e agenda
-            classes: com.sskings.agendai.catalog.*,com.sskings.agendai.schedule.*,com.sskings.agendai.tenant.TenantAccess
+            classes: com.sskings.agendai.catalog.*,com.sskings.agendai.schedule.*,com.sskings.agendai.tenant.TenantAccess,com.sskings.agendai.tenant.PublicAccess,com.sskings.agendai.publicbooking.*
             # os agendamentos usam o catálogo e a agenda (offer, calendar): os testes deles também matam mutantes aqui
-            tests: com.sskings.agendai.catalog.*Test,com.sskings.agendai.schedule.*Test,com.sskings.agendai.booking.*Test
+            tests: com.sskings.agendai.catalog.*Test,com.sskings.agendai.schedule.*Test,com.sskings.agendai.booking.*Test,com.sskings.agendai.publicbooking.*Test
           - area: agendamentos
             classes: com.sskings.agendai.booking.*
             # a regra "profissional só na própria agenda" é testada junto com o convite (quem cria o vínculo)

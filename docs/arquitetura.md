@@ -37,7 +37,7 @@
 | `catalog` | Serviços (duração, intervalo, preço em centavos) e profissionais com os serviços que cada um faz; até 100 serviços e 50 profissionais por estabelecimento (listas sempre limitadas); convites para a equipe (vínculo profissional ↔ conta) e `CatalogService.actor` (quem age por qual profissional), usado pela agenda e pelos agendamentos |
 | `schedule` | Expediente semanal por profissional (até 28 faixas), bloqueios e feriados (até 200 futuros por estabelecimento), cálculo de horários livres; usa o catálogo e o estabelecimento só pela API pública deles (`CatalogService.requireProfessional`/`offer`, `TenantService.zoneOf`) |
 | `booking` | Agendamentos (criar, cancelar, atendido, falta; remarcar e reservas temporárias na fase 2) e clientes (ADR-009); usa `catalog` (`offer`), `schedule` (`calendar`; implementa a porta `BusyPeriods`) e `tenant` (`TenantAccess`, `zoneOf`) — nenhum deles depende de `booking` (ArchUnit) |
-| `publicbooking` | Rotas públicas do cliente (sem login), verificação por código, links pessoais |
+| `publicbooking` | Rotas públicas do cliente (sem login) em `/api/public/{link}`: hoje só leitura (2a); verificação por código e links pessoais na 2b/2c. Entra no estabelecimento pelo guard `tenant.PublicAccess` (função `tenant_by_slug`, V6) e usa as mesmas regras do painel (`ScheduleService.slots`, `CatalogService.activeServices`) |
 | `waitlist` | Lista de espera e oferta de vaga |
 | `notification` | Outbox e publicação de eventos (o envio fica no worker) |
 | `auth`, `security` | Login da equipe, tokens, limites, cabeçalhos |
@@ -122,7 +122,7 @@ certa — sem `@Scheduled` que rodaria em todas as instâncias ao mesmo tempo.
 - Pool de conexões dimensionado e medido; índices definidos junto com cada consulta (e testados com `EXPLAIN` nos
   casos críticos).
 - Leitura mais frequente (horários livres da página pública) com cache curto no Redis, invalidado pelos eventos de
-  agendamento e de expediente. Pendente para a fase 2: a troca de expediente, a criação/remoção de bloqueio, a criação
+  agendamento e de expediente (a partir da 2b; a 2a roda sem cache). Pendente para a fase 2: a troca de expediente, a criação/remoção de bloqueio, a criação
   de agendamento e a mudança de status ainda não geram evento (entram pelo outbox junto com o cache; na mudança de
   status, só quando o `UPDATE` condicional alterou a linha), e os horários livres e a criação de agendamento fazem
   idas ao banco evitáveis (catálogo numa consulta só, cliente num comando só).
@@ -138,6 +138,10 @@ certa — sem `@Scheduled` que rodaria em todas as instâncias ao mesmo tempo.
 - Login: o BCrypt roda dentro da transação com a linha do usuário travada; mover a verificação para fora e gravar as
   falhas num `UPDATE` atômico, e dimensionar o pool do Hikari com teste de carga.
 - `refresh_tokens`: job de limpeza dos vencidos (com trava distribuída) e índice parcial dos ativos.
+- Página pública (2a): roda sem cache (o cache dos horários livres no Redis e a invalidação por evento vêm com a 2b);
+  falta o cenário k6 dela (medir sem cache antes, para comparar); cerca de 10 idas ao banco por consulta de horários
+  (o fuso é lido duas vezes); o limite de 120/min por IP pode pegar clientes atrás de CGNAT da operadora — medir e
+  ajustar (ADR-011).
 - Convite (1d): cadastro só de profissional (hoje o cadastro sempre cria um estabelecimento); `ProfessionalView.self`
   depende do usuário logado — para a página pública da fase 2, o vínculo deve vir em `/api/me`; o `Actor` faz uma
   consulta a mais por requisição (pode vir junto com a participação); limpeza de convites antigos.

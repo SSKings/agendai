@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { auth } from '../api/agendai'
 import { onSessionEnded, refreshSession, setAccessToken } from '../api/client'
 import type { Me, RegisterInput } from '../api/types'
+import { forgetInvite } from '../lib/pendingInvite'
 
 export type Status = 'loading' | 'in' | 'out'
 
@@ -12,6 +13,8 @@ interface AuthState {
   register: (input: RegisterInput) => Promise<void>
   logout: () => Promise<void>
   changePassword: (current: string, next: string) => Promise<void>
+  /** Busca /api/me de novo (ex.: entrou num estabelecimento pelo convite). */
+  reload: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthState | null>(null)
@@ -47,6 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     login: async (email, password) => enter((await auth.login(email.trim(), password)).accessToken),
     register: async (input) => enter((await auth.register(input)).accessToken),
     logout: async () => {
+      forgetInvite()   // um convite aberto nesta aba não fica para a próxima pessoa que entrar nela
       try {
         await auth.logout()
       } catch {
@@ -56,6 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     // a API revoga todas as sessões e devolve uma nova só para este aparelho
     changePassword: async (current, next) => setAccessToken((await auth.changePassword(current, next)).accessToken),
+    reload: async () => setMe(await auth.me()),
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

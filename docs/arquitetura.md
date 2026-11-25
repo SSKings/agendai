@@ -33,8 +33,8 @@
 | Módulo | Responsabilidade |
 |---|---|
 | `user` | Identidade da equipe (conta, senha, versão dos tokens); `/api/me` |
-| `tenant` | Estabelecimento, equipe, convites, papéis (`OWNER` dono, `PROFESSIONAL` profissional) |
-| `catalog` | Serviços (duração, intervalo, preço em centavos) e profissionais com os serviços que cada um faz; até 100 serviços e 50 profissionais por estabelecimento (listas sempre limitadas) |
+| `tenant` | Estabelecimento, equipe (participações), papéis (`OWNER` dono, `PROFESSIONAL` profissional); guard `TenantAccess` |
+| `catalog` | Serviços (duração, intervalo, preço em centavos) e profissionais com os serviços que cada um faz; até 100 serviços e 50 profissionais por estabelecimento (listas sempre limitadas); convites para a equipe (vínculo profissional ↔ conta) e `CatalogService.actor` (quem age por qual profissional), usado pela agenda e pelos agendamentos |
 | `schedule` | Expediente semanal por profissional (até 28 faixas), bloqueios e feriados (até 200 futuros por estabelecimento), cálculo de horários livres; usa o catálogo e o estabelecimento só pela API pública deles (`CatalogService.requireProfessional`/`offer`, `TenantService.zoneOf`) |
 | `booking` | Agendamentos (criar, cancelar, atendido, falta; remarcar e reservas temporárias na fase 2) e clientes (ADR-009); usa `catalog` (`offer`), `schedule` (`calendar`; implementa a porta `BusyPeriods`) e `tenant` (`TenantAccess`, `zoneOf`) — nenhum deles depende de `booking` (ArchUnit) |
 | `publicbooking` | Rotas públicas do cliente (sem login), verificação por código, links pessoais |
@@ -138,6 +138,9 @@ certa — sem `@Scheduled` que rodaria em todas as instâncias ao mesmo tempo.
 - Login: o BCrypt roda dentro da transação com a linha do usuário travada; mover a verificação para fora e gravar as
   falhas num `UPDATE` atômico, e dimensionar o pool do Hikari com teste de carga.
 - `refresh_tokens`: job de limpeza dos vencidos (com trava distribuída) e índice parcial dos ativos.
+- Convite (1d): cadastro só de profissional (hoje o cadastro sempre cria um estabelecimento); `ProfessionalView.self`
+  depende do usuário logado — para a página pública da fase 2, o vínculo deve vir em `/api/me`; o `Actor` faz uma
+  consulta a mais por requisição (pode vir junto com a participação); limpeza de convites antigos.
 - Fronteiras: principal próprio (DTO) em vez da entidade `User` no contexto de segurança; regra ArchUnit sem ciclos
   entre pacotes (`user` ↔ `tenant`, `user` ↔ `security`).
 - Métrica (Micrometer) para "Redis indisponível", além do log.

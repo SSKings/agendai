@@ -3,6 +3,11 @@ spring:
   docker:
     compose:
       enabled: false
+  datasource:
+    hikari:
+      # os testes de concorrência disparam 100 requisições de uma vez numa máquina compartilhada (CI): aqui o pool
+      # espera mais que em produção (5 s, application.yml); o que se mede nesses testes é a regra do banco, não a fila
+      connection-timeout: 30000
 agendai:
   jwt:
     secret: test-secret-only-for-tests-0123456789-abcdefghijklmnopqrstuvwxyz

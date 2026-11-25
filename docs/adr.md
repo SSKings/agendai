@@ -111,3 +111,27 @@ confirmação por código; o cliente precisa de uma identidade estável por esta
 **Consequência:** a fase 2 acrescenta status sem mexer na restrição; a regra de agendar (oferta, grade, horizonte,
 expediente, cliente) hoje mora em `BookingService.create`, atrás do guard de membro — na fase 2 ela vira um caso de
 uso sem guard próprio (`Propagation.MANDATORY`), chamado pelo painel e pela página pública, cada um com o seu guard.
+
+## ADR-010 — Entrada na equipe por convite: função SECURITY DEFINER e autorização por profissional
+
+**Contexto:** quem aceita um convite ainda não participa do estabelecimento: o RLS esconde o convite e a política de
+`memberships` (V1) só aceita o dono de um estabelecimento novo. Depois de entrar, o profissional precisa de uma regra
+única de "em que agenda posso mexer", usada por vários módulos.
+**Decisão:**
+- Aceitar é a função `redeem_invite` (V5), `SECURITY DEFINER`, a **única** que grava com o RLS desligado (as da V1 só
+  respondem sim/não) — exceção registrada ao ADR-006. Ela só cria participação `PROFESSIONAL` para o usuário da
+  transação (`app_user()`), confere código/uso/revogação/validade/profissional ativo sem vínculo, trava o convite e o
+  profissional, trata a corrida da mesma conta com `ON CONFLICT`, e não devolve nenhum dado do convite. `search_path`
+  fixo com `pg_temp` por último (também aplicado às funções da V1). O instante vem da aplicação (o mesmo relógio que
+  gravou a validade); só a aplicação chama a função (único papel com USAGE no schema).
+- O vínculo `professionals.user_id` tem FK composta para a participação, `ON DELETE SET NULL (user_id)`: não existe
+  vínculo sem participação, e tirar alguém da equipe (apagar a participação) desfaz o vínculo no banco.
+- O convite mora em `catalog` (dono dos profissionais), não em `tenant`: `catalog` já depende de `tenant` (guard), e o
+  contrário criaria um ciclo — garantido por ArchUnit.
+- Autorização por profissional (`CatalogService.Actor`): o dono age em tudo; o profissional da equipe só no
+  profissional **ativo** vinculado à conta dele; membro sem vínculo (ou com o profissional desativado), em nenhum. O que
+  pode ser do estabelecimento inteiro (feriado) é só do dono (`actsOn(null)`). Na resposta de criação de agendamento,
+  o profissional não recebe o e-mail guardado de um cliente que já existia.
+**Consequência:** uma porta de escrita fora do RLS, pequena e testada sozinha (`InviteRowLevelSecurityTest`); a regra
+"de quem é a agenda" num lugar só. Para a fase 2, o agendamento público precisa de uma origem "cliente" além do
+`Actor` da equipe (ADR-009): a checagem de acesso fica na entrada, não no caso de uso.

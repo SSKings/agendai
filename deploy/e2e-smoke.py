@@ -134,6 +134,18 @@ def main():
     check("aparece na agenda do dia", s == 200 and [b["id"] for b in ag["bookings"]] == [bk["id"]], ag)
     s, _, _ = call("PATCH", f"{base}/bookings/{bk['id']}", ana["accessToken"], {"status": "CANCELLED"})
     check("cancelar libera o horário", s == 200 and call("POST", base + "/bookings", ana["accessToken"], req)[0] == 201, s)
+    # ---- convite (fase 1d): o profissional entra com a própria conta e só vê a própria agenda ----
+    s, inv, _ = call("POST", f"{base}/professionals/{pro['id']}/invite", ana["accessToken"])
+    check("dono gera convite (código de 43 caracteres)", s == 201 and len(inv["code"]) == 43, s)
+    joao, _ = register("João Barbeiro", "Estúdio do João")
+    s, acc, _ = call("POST", "/api/invites/accept", joao["accessToken"], {"code": inv["code"]})
+    check("profissional aceita o convite com a própria conta", s == 200 and acc["tenantId"] == tenant["id"], acc)
+    check("o mesmo código não serve de novo", call("POST", "/api/invites/accept", eve["accessToken"], {"code": inv["code"]})[0] == 400)
+    s, mine, _ = call("GET", f"{base}/bookings?from={day}&to={day}", joao["accessToken"])
+    check("profissional vê a própria agenda", s == 200 and len(mine["bookings"]) >= 1
+          and all(b["professionalId"] == pro["id"] for b in mine["bookings"]), mine)
+    s, _, _ = call("POST", base + "/time-off", joao["accessToken"], {"start": f"{day}T00:00", "end": f"{day}T23:55"})
+    check("profissional não bloqueia o estabelecimento inteiro (só a própria agenda)", s == 403, s)
     check("agenda da Ana: 404 para outro dono",
           call("GET", f"{base}/bookings?from={day}&to={day}", eve["accessToken"])[0] == 404)
     check("bloqueios da Ana: 404 para outro dono", call("GET", f"{base}/time-off?from={day}&to={day}", eve["accessToken"])[0] == 404)

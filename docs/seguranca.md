@@ -22,9 +22,10 @@ A coluna "Teste" aponta o teste que falha sem o controle (ou a fase em que o con
 | Robô esgotando a agenda com reservas temporárias | Limite por IP e por estabelecimento **no Redis** (vale entre instâncias); reservas expiram em 5 min; teto de reservas abertas por IP | Limite por IP no Redis: `RateLimitIntegrationTest`, `RateLimitFilterTest`. Reservas e teto por IP: fase 2 |
 | Força bruta no login da equipe | Bloqueio progressivo por conta, limite por IP (IPv6 por /64), mesma resposta para e-mail inexistente | `AuthIntegrationTest.lockout` / `lockoutCap` / `login` (mesma resposta para e-mail inexistente), `RateLimitIntegrationTest.limitPerIp` / `ipv6Block`, `RateLimitFilterTest` (Redis fora: não derruba a API) |
 | Senha fraca | Política com lista de senhas comuns e disfarces (`s3nh@`), sem nome/e-mail | `PasswordStrengthTest`, `AuthIntegrationTest.registerValidation` |
-| Sessão roubada | Access token curto (15 min) **só em memória** no front + refresh token em cookie `HttpOnly; Secure; SameSite=Strict` com rotação e detecção de reuso; logout revoga tudo (ADR-005) | `AuthIntegrationTest.refreshRotates` / `refreshReuseRevokesFamily` / `expiry` / `logout` / `changePassword`, `JwtServiceTest`, `JwtAuthFilterTest` (versão antiga recusada); front: `client.test.ts` (nada em `localStorage`/`sessionStorage`; um refresh por vez, inclusive entre abas); E2E: atributos do cookie, rotação e reuso através do nginx |
+| Sessão roubada | Access token curto (15 min) **só em memória** no front + refresh token em cookie `HttpOnly; Secure; SameSite=Strict` com rotação e detecção de reuso; logout revoga tudo (ADR-005) | `AuthIntegrationTest.refreshRotates` / `refreshReuseRevokesFamily` / `expiry` / `logout` / `changePassword`, `JwtServiceTest`, `JwtAuthFilterTest` (versão antiga recusada); front: `client.test.ts` (nenhum token de sessão em `localStorage`/`sessionStorage`; um refresh por vez, inclusive entre abas); E2E: atributos do cookie, rotação e reuso através do nginx |
 | Link de cancelar/remarcar vazado | Token de 256 bits, só o hash no banco, escopo de um agendamento, expira após o horário; ações sensíveis pedem confirmação | fase 2 |
-| Convite para a equipe reutilizado | Código de uso único, hash no banco, expira em 72 h, revogável | fase 1 |
+| Convite para a equipe reutilizado ou vazado | Código de 256 bits mostrado uma vez, só o SHA-256 no banco, uso único, expira em 72 h, revogável (novo convite revoga o anterior); vai no fragmento da URL (`/convite#código`, nunca enviado ao servidor nem no Referer) e no corpo do POST; antes do login fica só em `sessionStorage` desta aba (some ao aceitar, recusar, sair da conta ou fechar a aba); resposta igual para código inválido, usado, revogado ou vencido; aceitar passa por função `SECURITY DEFINER` com o usuário da transação (a política de `memberships` continua barrando entrada direta) | `InviteIntegrationTest` (fluxo, `invalidCodes`, `concurrentAccept`), `InviteRowLevelSecurityTest` |
+| Profissional vendo ou mexendo na agenda de outro (dados de clientes); ex-funcionário | Agenda, agendamentos, status e bloqueios só do profissional **ativo** vinculado à conta (ADR-010); o dono, em todos; membro sem vínculo, em nenhum; o dono tira a conta da equipe (`DELETE .../account`) e o vínculo some pela FK; ao agendar com telefone de cliente existente, o profissional não recebe o e-mail guardado | `InviteIntegrationTest.ownAgendaBookings` / `ownTimeOff` / `inactiveProfessional` / `removeAccount` / `customerEmailNotLeaked`, `ActorTest` |
 | Campo extra no JSON (mass assignment) | `fail-on-unknown-properties`; DTOs separados das entidades | `AuthIntegrationTest.registerValidation` (`role` extra → 400); E2E; `ArchitectureTest.noEntitiesInApi` |
 | Injeção (SQL, HTML, cabeçalho de e-mail) | Só consultas parametrizadas; texto sem caracteres de controle; e-mails com conteúdo escapado | `AuthIntegrationTest.registerValidation` (quebra de linha, NUL e U+2028 recusados); consultas parametrizadas (CodeQL); e-mails: fase 3 |
 | XSS | React sem `dangerouslySetInnerHTML`; CSP `script-src 'self'`; token fora do `localStorage` | E2E (CSP `script-src 'self'`, `frame-ancestors 'none'`); `client.test.ts` (token fora do armazenamento do navegador) |
@@ -52,9 +53,13 @@ RLS e FKs compostas também em `bookings` e `customers` (`BookingRowLevelSecurit
 agendamentos criados por estabelecimento em 24 h (criar e cancelar em laço não enche o banco); telefone já cadastrado
 com outro nome é 409 sem revelar o nome (não vira consulta "telefone → cliente"); mudança de status atômica (dois
 pedidos simultâneos não se sobrescrevem); `@PlainText` passa a barrar também controles fora do ASCII (NEL) e
-caracteres invisíveis de formatação (inversão de sentido), e vale para o e-mail do cliente. Enquanto o convite da equipe
-(1d) não existe, qualquer membro agenda e muda status de qualquer profissional; a 1d restringe o profissional à
-própria agenda.
+caracteres invisíveis de formatação (inversão de sentido), e vale para o e-mail do cliente. Desde a 1d, o profissional
+da equipe só age na própria agenda (linha "Profissional vendo ou mexendo na agenda de outro", acima).
+
+Fase 1d (convite), riscos aceitos e pendências: o 409 "telefone com outro nome" confirma a um profissional da equipe
+que aquele telefone é cliente do estabelecimento (sem revelar nome nem e-mail); o aceite de convite não tem limite por
+IP (código de 256 bits, exige login); a página de aceite não mostra o nome do estabelecimento antes de aceitar
+(prévia por hash, com limite, fica para depois); convites usados/vencidos/revogados ainda sem limpeza periódica.
 
 Revisão da fase 1b (agenda): datas fora de uma janela razoável (listagem de 1 ano para trás a 2 para a frente; bloqueio
 terminando em até 2 anos) viram 400 em vez de 500 com stack no log, e nenhum bloqueio "eterno" ocupa o teto dos

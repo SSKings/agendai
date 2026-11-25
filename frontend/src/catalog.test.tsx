@@ -8,17 +8,19 @@ import { renderApp } from './test/render'
 const T = '/api/tenants/t1'
 const CORTE: ServiceView = { id: 's1', name: 'Corte', durationMinutes: 30, bufferMinutes: 10, priceCents: 4500, active: true }
 const BARBA: ServiceView = { id: 's2', name: 'Barba', durationMinutes: 20, bufferMinutes: 0, priceCents: 3000, active: false }
-const JOAO: ProfessionalView = { id: 'p1', name: 'João', active: true, serviceIds: ['s1', 's2'] }
-const BETO: ProfessionalView = { id: 'p2', name: 'Beto', active: false, serviceIds: [] }
+const JOAO: ProfessionalView = { id: 'p1', name: 'João', active: true, serviceIds: ['s1', 's2'], hasAccount: false, self: false }
+const BETO: ProfessionalView = { id: 'p2', name: 'Beto', active: false, serviceIds: [], hasAccount: false, self: false }
 const AS_PROFESSIONAL: Me = { ...ME, tenants: [{ ...ME.tenants[0], role: 'PROFESSIONAL' }] }
 
 const logged = (routes: Record<string, unknown>, me: Me = ME) => ({ 'POST /api/auth/refresh': session('tok'), 'GET /api/me': me, ...routes })
 
 describe('área do estabelecimento', () => {
-  it('do início, o nome do estabelecimento leva aos serviços; abas trocam entre serviços e equipe', async () => {
-    mockApi(logged({ [`GET ${T}/services`]: [CORTE], [`GET ${T}/professionals`]: [JOAO] }))
+  it('do início, o nome do estabelecimento leva à agenda; abas trocam entre serviços e equipe', async () => {
+    mockApi(logged({ [`GET ${T}/services`]: [CORTE], [`GET ${T}/professionals`]: [JOAO], [`GET ${T}/bookings`]: { truncated: false, bookings: [] } }))
     renderApp('/')
     await userEvent.click(await screen.findByRole('link', { name: 'Barbearia da Ana' }))
+    expect(await screen.findByText('Nenhum agendamento no período.')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('link', { name: 'Serviços' }))
     expect(await screen.findByText('Corte')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Serviços' })).toHaveAttribute('aria-current', 'page')
     await userEvent.click(screen.getByRole('link', { name: 'Equipe' }))

@@ -56,6 +56,15 @@ public class TenantService {
         return ZoneId.of(tenants.timeZoneOf(tenantId).orElseThrow(() -> ApiException.notFound(TenantAccess.NOT_FOUND)));
     }
 
+    /** Tira um profissional da equipe (nunca o dono), dentro de uma transação que já passou pelo guard do dono. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void removeProfessional(UUID tenantId, UUID userId) {
+        memberships.findById(new Membership.Key(tenantId, userId))
+                .filter(m -> m.getRole() == Role.PROFESSIONAL)
+                .ifPresent(memberships::delete);
+        memberships.flush();   // a FK de professionals.user_id (ON DELETE SET NULL) age já, dentro da transação
+    }
+
     /** Os estabelecimentos de quem está logado (o RLS já restringe às participações dele). */
     @Transactional(readOnly = true)
     public List<TenantView> mine(UUID userId) {

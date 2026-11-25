@@ -45,6 +45,12 @@ const MESSAGES: Record<string, string> = {
   'Phone registered with another name': 'Esse telefone já está cadastrado com outro nome. Confira o número ou use o nome do cadastro.',
   'Time does not exist or repeats on this day': 'Esse horário não existe ou se repete nesse dia (horário de verão).',
   'Busy, try again': 'O sistema está ocupado agora. Tente de novo em instantes.',
+  'Only your own agenda': 'Você só pode mexer na sua própria agenda.',
+  'Professional already has an account': 'Esse profissional já tem conta vinculada.',
+  'Invalid or expired invite': 'Convite inválido, já usado ou vencido. Peça um novo ao dono do estabelecimento.',
+  'Already a member of this business': 'Você já faz parte deste estabelecimento.',
+  'Professional is inactive': 'Ative o profissional antes de convidar.',
+  'Professional has no linked account': 'Esse profissional não tem conta vinculada.',
 }
 
 export const GENERIC_ERROR = 'Algo deu errado. Tente de novo.'

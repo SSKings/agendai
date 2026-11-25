@@ -41,5 +41,6 @@ public final class CatalogDtos {
         }
     }
 
-    public record ProfessionalView(UUID id, String name, boolean active, List<UUID> serviceIds) {}
+    /** {@code hasAccount}: aceitou o convite (tem login); {@code self}: é quem está fazendo a requisição. */
+    public record ProfessionalView(UUID id, String name, boolean active, List<UUID> serviceIds, boolean hasAccount, boolean self) {}
 }

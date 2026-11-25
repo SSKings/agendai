@@ -5,6 +5,9 @@ import com.sskings.agendai.catalog.CatalogDtos.ProfessionalView;
 import com.sskings.agendai.catalog.CatalogDtos.ServiceRequest;
 import com.sskings.agendai.catalog.CatalogDtos.ServiceView;
 import com.sskings.agendai.common.ApiException;
+import com.sskings.agendai.security.CurrentUser;
+import com.sskings.agendai.tenant.Membership;
+import com.sskings.agendai.tenant.Role;
 import com.sskings.agendai.tenant.TenantAccess;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -135,7 +138,8 @@ public class CatalogService {
     }
 
     private static ProfessionalView view(Professional p, List<UUID> serviceIds) {
-        return new ProfessionalView(p.getId(), p.getName(), p.isActive(), serviceIds);
+        return new ProfessionalView(p.getId(), p.getName(), p.isActive(), serviceIds, p.getUserId() != null,
+                CurrentUser.id().map(id -> id.equals(p.getUserId())).orElse(false));
     }
 
     // ---------- para outros módulos (agenda) ----------
@@ -163,6 +167,44 @@ public class CatalogService {
             throw ApiException.badRequest(NOT_PERFORMED);
         }
         return new Offer(s.getDurationMinutes(), s.getBufferMinutes(), s.getPriceCents(), p.isActive() && s.isActive());
+    }
+
+    /** Só o profissional vinculado mexe na própria agenda; o dono, em todas. */
+    public static final String OWN_AGENDA = "Only your own agenda";
+
+    /**
+     * Quem está agindo no estabelecimento: o dono (age por todos) ou um profissional da equipe (só pelo profissional
+     * vinculado à conta dele; sem vínculo, por ninguém).
+     */
+    public record Actor(boolean owner, UUID professionalId) {
+        public boolean actsFor(UUID professional) {
+            return owner || professional.equals(professionalId);
+        }
+
+        /** 403 se não puder agir por este profissional. */
+        public void requireFor(UUID professional) {
+            if (!actsFor(professional)) throw ApiException.forbidden(OWN_AGENDA);
+        }
+
+        /**
+         * Para o que pode ser de um profissional ou do estabelecimento inteiro (null, ex.: feriado): o dono age em tudo;
+         * o profissional, só no que é dele.
+         */
+        public boolean actsOn(UUID professionalOrNull) {
+            return owner || professionalOrNull != null && actsFor(professionalOrNull);
+        }
+
+        /** O profissional da conta (para filtrar "a minha agenda"); 403 se a conta não tiver vínculo. */
+        public UUID own() {
+            if (professionalId == null) throw ApiException.forbidden(OWN_AGENDA);
+            return professionalId;
+        }
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Actor actor(UUID tenantId, Membership m) {
+        return m.getRole() == Role.OWNER ? new Actor(true, null)
+                : new Actor(false, professionals.idOfUser(tenantId, m.getId().userId()).orElse(null));
     }
 
     private Professional professional(UUID tenantId, UUID id) {

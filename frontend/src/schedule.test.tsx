@@ -11,9 +11,9 @@ const T = '/api/tenants/t1'
 const CORTE: ServiceView = { id: 's1', name: 'Corte', durationMinutes: 30, bufferMinutes: 10, priceCents: 4500, active: true }
 const BARBA: ServiceView = { id: 's2', name: 'Barba', durationMinutes: 20, bufferMinutes: 0, priceCents: 3000, active: true }
 const UNHA: ServiceView = { id: 's3', name: 'Unha', durationMinutes: 40, bufferMinutes: 0, priceCents: 3000, active: false }
-const JOAO: ProfessionalView = { id: 'p1', name: 'João', active: true, serviceIds: ['s1', 's2'] }
-const BETO: ProfessionalView = { id: 'p2', name: 'Beto', active: false, serviceIds: ['s1'] }
-const CAIO: ProfessionalView = { id: 'p3', name: 'Caio', active: true, serviceIds: ['s1'] }
+const JOAO: ProfessionalView = { id: 'p1', name: 'João', active: true, serviceIds: ['s1', 's2'], hasAccount: false, self: false }
+const BETO: ProfessionalView = { id: 'p2', name: 'Beto', active: false, serviceIds: ['s1'], hasAccount: false, self: false }
+const CAIO: ProfessionalView = { id: 'p3', name: 'Caio', active: true, serviceIds: ['s1'], hasAccount: false, self: false }
 const AS_PROFESSIONAL: Me = { ...ME, tenants: [{ ...ME.tenants[0], role: 'PROFESSIONAL' }] }
 const TODAY = todayIn('America/Sao_Paulo')
 

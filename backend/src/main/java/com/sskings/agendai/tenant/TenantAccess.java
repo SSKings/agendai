@@ -42,4 +42,13 @@ public class TenantAccess {
         if (member(tenantId).getRole() != Role.OWNER) throw ApiException.forbidden(OWNERS_ONLY);
         db.lockTenant(tenantId);
     }
+
+    /**
+     * A trava de escrita do estabelecimento, para escritas que a equipe também faz: chame DEPOIS de {@link #member} e da
+     * autorização da regra própria — quem vai receber 403 não entra na fila das escritas dos outros.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void lock(UUID tenantId) {
+        db.lockTenant(tenantId);
+    }
 }

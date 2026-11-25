@@ -1,9 +1,11 @@
 import { useCallback, useState } from 'react'
 import { catalog } from '../api/catalog'
-import type { ProfessionalView, ServiceView } from '../api/types'
+import { invites } from '../api/invites'
+import type { InviteView, ProfessionalView, ServiceView } from '../api/types'
 import { Alert, Button, Check, Field, Submit } from '../components/fields'
 import { useLoad } from '../components/useLoad'
 import { useSubmit } from '../components/useSubmit'
+import { messageOf } from '../lib/errors'
 import { useTenant } from './TenantLayout'
 
 export function TeamPage() {
@@ -44,10 +46,13 @@ export function TeamPage() {
             <div className="flex-1">
               <p className="font-medium text-slate-900">
                 {p.name} {!p.active && <span className="ml-2 rounded bg-slate-100 px-1.5 text-xs text-slate-500">inativo</span>}
+                {p.hasAccount && <span className="ml-2 rounded bg-emerald-50 px-1.5 text-xs text-emerald-700">{p.self ? 'você' : 'com conta'}</span>}
               </p>
               <p className="text-sm text-slate-500">
                 {servicesOf(p, serviceName)}
               </p>
+              {owner && !p.hasAccount && <InvitePanel tenantId={tenant.id} professional={p} />}
+              {owner && p.hasAccount && <RemoveAccount tenantId={tenant.id} professional={p} onDone={reload} />}
             </div>
             {owner && <Button aria-label={`Editar ${p.name}`} onClick={() => setEditing(p)}>Editar</Button>}
           </li>
@@ -102,5 +107,82 @@ function ProfessionalForm({ tenantId, professional, services, onDone, onCancel }
         <Button onClick={onCancel}>Cancelar</Button>
       </div>
     </form>
+  )
+}
+
+const EXPIRES = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+
+/**
+ * Convite de uso único para o profissional criar (ou usar) a conta dele e entrar na equipe. O link só aparece aqui,
+ * uma vez: gerar outro ou cancelar invalida o anterior.
+ */
+function InvitePanel({ tenantId, professional }: { tenantId: string; professional: ProfessionalView }) {
+  const [invite, setInvite] = useState<InviteView | null>(null)
+  const [copied, setCopied] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const link = invite && `${window.location.origin}/convite#${invite.code}`
+  const run = async (action: () => Promise<void>) => {
+    setError(null)
+    setCopied(false)
+    try {
+      await action()
+    } catch (err) {
+      setError(messageOf(err, 'Não foi possível concluir. Tente de novo.'))
+    }
+  }
+  return (
+    <div className="mt-2 space-y-2">
+      {!invite ? (
+        <Button aria-label={`Convidar ${professional.name}`} onClick={() => void run(async () => setInvite(await invites.create(tenantId, professional.id)))}>
+          Convidar para a equipe
+        </Button>
+      ) : (
+        <div className="space-y-2 rounded-lg bg-slate-50 p-3 text-sm">
+          <p className="text-slate-600">
+            Envie este link para {professional.name} (vale até {EXPIRES.format(new Date(invite.expiresAt))}, uma vez só):
+          </p>
+          <input readOnly aria-label={`Link do convite de ${professional.name}`} value={link!} onFocus={(e) => e.target.select()}
+            className="w-full rounded border border-slate-300 bg-white px-2 py-1 font-mono text-xs" />
+          <div className="flex gap-2">
+            <Button onClick={() => void run(async () => { await navigator.clipboard.writeText(link!); setCopied(true) })}>
+              {copied ? 'Copiado!' : 'Copiar link'}
+            </Button>
+            <Button onClick={() => void run(async () => { await invites.revoke(tenantId, professional.id); setInvite(null) })}>
+              Cancelar convite
+            </Button>
+          </div>
+        </div>
+      )}
+      {error && <Alert>{error}</Alert>}
+    </div>
+  )
+}
+
+/** Quem saiu do estabelecimento perde o acesso; o profissional (e os agendamentos dele) continuam no cadastro. */
+function RemoveAccount({ tenantId, professional, onDone }: { tenantId: string; professional: ProfessionalView; onDone: () => Promise<void> }) {
+  const [confirming, setConfirming] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const remove = async () => {
+    try {
+      setError(null)
+      await invites.removeAccount(tenantId, professional.id)
+      await onDone()
+    } catch (err) {
+      setError(messageOf(err, 'Não foi possível remover o acesso.'))
+    }
+  }
+  return (
+    <div className="mt-2 space-y-2">
+      {!confirming ? (
+        <Button aria-label={`Remover ${professional.name} da equipe`} onClick={() => setConfirming(true)}>Remover da equipe</Button>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+          {professional.name} perde o acesso ao estabelecimento.
+          <Button onClick={() => void remove()}>Confirmar</Button>
+          <Button onClick={() => setConfirming(false)}>Voltar</Button>
+        </div>
+      )}
+      {error && <Alert>{error}</Alert>}
+    </div>
   )
 }

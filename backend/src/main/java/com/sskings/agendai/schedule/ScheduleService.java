@@ -9,7 +9,6 @@ import com.sskings.agendai.schedule.ScheduleDtos.WorkingHoursRequest;
 import com.sskings.agendai.schedule.ScheduleDtos.WorkingHoursView;
 import com.sskings.agendai.schedule.ScheduleDtos.WorkingInterval;
 import com.sskings.agendai.schedule.Slots.Span;
-import com.sskings.agendai.tenant.Role;
 import com.sskings.agendai.tenant.TenantAccess;
 import com.sskings.agendai.tenant.TenantService;
 import lombok.RequiredArgsConstructor;
@@ -124,7 +123,7 @@ public class ScheduleService {
     /** Bloqueios que encostam nos dias de {@code from} a {@code to} (inclusive), no fuso do estabelecimento. */
     @Transactional(readOnly = true)
     public List<TimeOffView> timeOff(UUID tenantId, LocalDate from, LocalDate to) {
-        boolean owner = access.member(tenantId).getRole() == Role.OWNER;
+        CatalogService.Actor actor = catalog.actor(tenantId, access.member(tenantId));
         long days = ChronoUnit.DAYS.between(from, to);
         if (days < 0 || days >= MAX_PERIOD_DAYS) throw ApiException.badRequest(INVALID_PERIOD);
         ZoneId zone = tenants.zoneOf(tenantId);
@@ -133,13 +132,17 @@ public class ScheduleService {
         Instant start = from.atStartOfDay(zone).toInstant();
         return timeOff.overlapping(tenantId, start.minus(LONGEST_TIME_OFF), start, to.plusDays(1).atStartOfDay(zone).toInstant(),
                         Limit.of(MAX_LISTED_TIME_OFF))
-                .stream().map(t -> view(t, zone, owner)).toList();
+                .stream().map(t -> view(t, zone, actor.actsOn(t.getProfessionalId())))
+                .toList();
     }
 
     @Transactional
     public TimeOffView createTimeOff(UUID tenantId, TimeOffRequest r) {
-        access.owner(tenantId);
+        CatalogService.Actor actor = catalog.actor(tenantId, access.member(tenantId));
         if (r.professionalId() != null) catalog.requireProfessional(tenantId, r.professionalId());
+        // profissional da equipe bloqueia só a própria agenda (folga, almoço); feriado do estabelecimento é do dono
+        if (!actor.actsOn(r.professionalId())) throw ApiException.forbidden(CatalogService.OWN_AGENDA);
+        access.lock(tenantId);
         if (!onStep(r.start()) || !onStep(r.end())) throw ApiException.badRequest(FIVE_MINUTE_STEPS);
         ZoneId zone = tenants.zoneOf(tenantId);
         if (r.end().toLocalDate().isAfter(LocalDate.now(clock.withZone(zone)).plusDays(FUTURE_DAYS))) {
@@ -157,15 +160,18 @@ public class ScheduleService {
 
     @Transactional
     public void deleteTimeOff(UUID tenantId, UUID id) {
-        access.owner(tenantId);
-        timeOff.delete(timeOff.findByIdAndTenantId(id, tenantId).orElseThrow(() -> ApiException.notFound(TIME_OFF_NOT_FOUND)));
+        CatalogService.Actor actor = catalog.actor(tenantId, access.member(tenantId));
+        TimeOff t = timeOff.findByIdAndTenantId(id, tenantId).orElseThrow(() -> ApiException.notFound(TIME_OFF_NOT_FOUND));
+        if (!actor.actsOn(t.getProfessionalId())) throw ApiException.forbidden(CatalogService.OWN_AGENDA);
+        access.lock(tenantId);
+        timeOff.delete(t);
     }
 
     private static boolean onStep(LocalDateTime t) {
         return t.getMinute() % 5 == 0 && t.getSecond() == 0 && t.getNano() == 0;
     }
 
-    /** O motivo pode ser pessoal ("médico"): só o dono vê; para o resto da equipe o período aparece sem ele. */
+    /** O motivo pode ser pessoal ("médico"): só o dono e o próprio profissional veem; os outros, só o período. */
     private static TimeOffView view(TimeOff t, ZoneId zone, boolean withReason) {
         return new TimeOffView(t.getId(), t.getProfessionalId(), LocalDateTime.ofInstant(t.getStartAt(), zone),
                 LocalDateTime.ofInstant(t.getEndAt(), zone), withReason ? t.getReason() : null);

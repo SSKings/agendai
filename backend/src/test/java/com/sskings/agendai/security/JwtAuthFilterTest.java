@@ -68,4 +68,19 @@ class JwtAuthFilterTest {
         when(users.findById(ana.getId())).thenReturn(Optional.empty());
         assertThat(run("Bearer " + jwt.generate(ana))).as("usuário não existe mais").isNull();
     }
+
+    @Test
+    @DisplayName("Pool sem conexão a tempo: 503 'tente de novo' na hora, sem seguir a cadeia (filtro: o handler global não alcança)")
+    void poolExhausted() throws Exception {
+        when(users.findById(ana.getId())).thenThrow(new org.springframework.transaction.CannotCreateTransactionException("pool"));
+        MockHttpServletRequest req = new MockHttpServletRequest("GET", "/api/me");
+        req.addHeader("Authorization", "Bearer " + jwt.generate(ana));
+        MockHttpServletResponse res = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+        filter.doFilter(req, res, chain);
+        assertThat(res.getStatus()).isEqualTo(503);
+        assertThat(res.getContentType()).isEqualTo("application/json");
+        assertThat(res.getContentAsString()).isEqualTo("{\"status\":503,\"message\":\"Busy, try again\",\"errors\":null}");
+        assertThat(chain.getRequest()).isNull();
+    }
 }

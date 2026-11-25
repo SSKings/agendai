@@ -65,4 +65,37 @@ class TenantAccessTest extends IntegrationTest {
             s.setRollbackOnly();                                // o 404 desfaz a transação, como na rota
         });
     }
+
+    @Test
+    @DisplayName("lock: pega a trava de escrita do estabelecimento (até o fim da transação), depois do guard")
+    void lockTakesTheTenantLock() throws Exception {
+        Session ana = register();
+        UUID tenant = UUID.fromString(ana.tenantId());
+        loginAs(UUID.fromString(ana.userId()));
+        tx.executeWithoutResult(s -> {
+            String locks = "SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND pid = pg_backend_pid()";
+            assertThat(em.createNativeQuery(locks).getSingleResult().toString()).isEqualTo("0");
+            assertThat(access.member(tenant).getRole()).isEqualTo(Role.OWNER);
+            assertThat(em.createNativeQuery(locks).getSingleResult().toString()).as("o guard sozinho não trava").isEqualTo("0");
+            access.lock(tenant);
+            assertThat(em.createNativeQuery(locks).getSingleResult().toString()).isEqualTo("1");
+        });
+    }
+
+    @Autowired TenantService tenants;
+
+    @Test
+    @DisplayName("removeProfessional nunca tira o dono, mesmo se chamado com a conta dele")
+    void neverRemovesOwner() throws Exception {
+        Session ana = register();
+        UUID tenant = UUID.fromString(ana.tenantId());
+        UUID owner = UUID.fromString(ana.userId());
+        loginAs(owner);
+        tx.executeWithoutResult(s -> {
+            access.owner(tenant);
+            tenants.removeProfessional(tenant, owner);
+        });
+        assertThat(ownerCount("SELECT count(*) FROM memberships WHERE tenant_id = ? AND user_id = ? AND role = 'OWNER'", tenant, owner))
+                .isEqualTo(1);
+    }
 }

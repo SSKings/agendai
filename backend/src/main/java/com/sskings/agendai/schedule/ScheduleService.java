@@ -15,6 +15,7 @@ import com.sskings.agendai.tenant.TenantService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
@@ -27,6 +28,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
@@ -43,11 +45,12 @@ public class ScheduleService {
     static final int MAX_UPCOMING_TIME_OFF = 200;      // bloqueios que ainda não terminaram, por estabelecimento
     static final int MAX_PERIOD_DAYS = 92;             // listagem e duração de um bloqueio
     static final int MAX_LISTED_TIME_OFF = 500;
-    static final int HORIZON_DAYS = 180;
+    /** Até quantos dias à frente se consulta horário livre ou se agenda (teto técnico; ADR-008). */
+    public static final int HORIZON_DAYS = 180;
     static final int HISTORY_DAYS = 366;               // listagem de bloqueios: até um ano para trás…
     static final int FUTURE_DAYS = 2 * 366;            // …e dois para a frente (também o fim máximo de um bloqueio)
     /** Duração máxima de um bloqueio; as consultas por período contam com ela para limitar a faixa lida do índice. */
-    static final Duration LONGEST_TIME_OFF = Duration.ofDays(MAX_PERIOD_DAYS);               // até quantos dias à frente se consulta horário livre
+    static final Duration LONGEST_TIME_OFF = Duration.ofDays(MAX_PERIOD_DAYS);
 
     static final String END_BEFORE_START = "End must be after start";
     static final String OVERLAP = "Overlapping working hours";
@@ -65,6 +68,7 @@ public class ScheduleService {
     private final WorkingHoursRepository hours;
     private final TimeOffRepository timeOff;
     private final Clock clock;
+    private final List<BusyPeriods> busyPeriods;
 
     // ---------- expediente ----------
 
@@ -194,14 +198,32 @@ public class ScheduleService {
         // o que terminou antes de agora não tira horário (nenhum começa no passado): os bloqueios lidos são no máximo
         // os ainda não terminados, que têm teto
         Instant from = first.isAfter(now) ? first : now;
-        List<Span> busy = timeOff.blocking(tenantId, professionalId, first.minus(LONGEST_TIME_OFF), from, working.get(working.size() - 1).end())
-                .stream()
-                .map(t -> new Span(t.getStartAt(), t.getEndAt()))
-                .toList();
+        Instant to = working.get(working.size() - 1).end();
+        List<Span> busy = new ArrayList<>();
+        timeOff.blocking(tenantId, professionalId, first.minus(LONGEST_TIME_OFF), from, to)
+                .forEach(t -> busy.add(new Span(t.getStartAt(), t.getEndAt())));
+        for (BusyPeriods p : busyPeriods) {
+            p.busy(tenantId, professionalId, from, to).forEach(b -> busy.add(new Span(b.start(), b.end())));
+        }
         Duration block = Duration.ofMinutes(offer.durationMinutes() + offer.bufferMinutes());
         return Slots.free(working, busy, block, now).stream()
                 .map(t -> t.atZone(zone).toOffsetDateTime())
                 .toList();
+    }
+
+    // ---------- para outros módulos (agendamento) ----------
+
+    /**
+     * Expediente dos profissionais e bloqueios que encostam em [from, to), para consultas em memória. Só dentro de uma
+     * transação que já passou pelo guard (sem ele, o RLS esconde tudo e o calendário vem vazio).
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public WorkCalendar calendar(UUID tenantId, ZoneId zone, Collection<UUID> professionalIds, Instant from, Instant to) {
+        // só os bloqueios desses profissionais e os gerais; o teto é uma rede de segurança (os que ainda não terminaram
+        // são no máximo 200 — passado distante só aparece na agenda de semanas antigas)
+        List<TimeOff> off = timeOff.blockingAny(tenantId, professionalIds, from.minus(LONGEST_TIME_OFF), from, to,
+                Limit.of(MAX_LISTED_TIME_OFF));
+        return new WorkCalendar(zone, hours.findByTenantIdAndProfessionalIdIn(tenantId, professionalIds), off);
     }
 
     /** Hora de relógio na parede do estabelecimento → instante. 1440 min = 00:00 do dia seguinte. */

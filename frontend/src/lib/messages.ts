@@ -33,6 +33,18 @@ const MESSAGES: Record<string, string> = {
   'Time off limit reached': 'Limite de bloqueios futuros atingido.',
   'Date out of range': 'Escolha uma data entre hoje e 180 dias à frente.',
   'Professional does not perform this service': 'Esse profissional não faz esse serviço.',
+  'Booking not found': 'Agendamento não encontrado. Recarregue a página.',
+  'Service or professional inactive': 'O serviço ou o profissional está inativo.',
+  'Invalid phone': 'Telefone inválido: informe DDD e número.',
+  'Start in the past': 'Esse horário já passou.',
+  'Outside working hours': 'Fora do expediente ou num bloqueio do profissional.',
+  'Time slot not available': 'Esse horário acabou de ser ocupado. Escolha outro.',
+  'Invalid status change': 'Esse agendamento já foi finalizado.',
+  'Booking has not started': 'Só dá para marcar atendido ou falta depois do horário de início.',
+  'Booking limit reached': 'Limite de agendamentos do dia atingido. Tente mais tarde.',
+  'Phone registered with another name': 'Esse telefone já está cadastrado com outro nome. Confira o número ou use o nome do cadastro.',
+  'Time does not exist or repeats on this day': 'Esse horário não existe ou se repete nesse dia (horário de verão).',
+  'Busy, try again': 'O sistema está ocupado agora. Tente de novo em instantes.',
 }
 
 export const GENERIC_ERROR = 'Algo deu errado. Tente de novo.'

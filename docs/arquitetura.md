@@ -36,7 +36,7 @@
 | `tenant` | Estabelecimento, equipe, convites, papéis (`OWNER` dono, `PROFESSIONAL` profissional) |
 | `catalog` | Serviços (duração, intervalo, preço em centavos) e profissionais com os serviços que cada um faz; até 100 serviços e 50 profissionais por estabelecimento (listas sempre limitadas) |
 | `schedule` | Expediente semanal por profissional (até 28 faixas), bloqueios e feriados (até 200 futuros por estabelecimento), cálculo de horários livres; usa o catálogo e o estabelecimento só pela API pública deles (`CatalogService.requireProfessional`/`offer`, `TenantService.zoneOf`) |
-| `booking` | Agendamentos (criar, cancelar, remarcar, atendido, falta), reservas temporárias |
+| `booking` | Agendamentos (criar, cancelar, atendido, falta; remarcar e reservas temporárias na fase 2) e clientes (ADR-009); usa `catalog` (`offer`), `schedule` (`calendar`; implementa a porta `BusyPeriods`) e `tenant` (`TenantAccess`, `zoneOf`) — nenhum deles depende de `booking` (ArchUnit) |
 | `publicbooking` | Rotas públicas do cliente (sem login), verificação por código, links pessoais |
 | `waitlist` | Lista de espera e oferta de vaga |
 | `notification` | Outbox e publicação de eventos (o envio fica no worker) |
@@ -58,8 +58,11 @@ token). A partir da fase 1 a regra fica mais estrita (pendências da revisão da
 - `tenants`, `memberships` (usuário × estabelecimento × papel), `professionals`, `services`, `professional_services`.
 - `working_hours` (por profissional e dia da semana, em minutos do dia no fuso local; a API troca a semana inteira
   de uma vez) e `time_off` (bloqueios em UTC; sem profissional = o estabelecimento inteiro).
-- `bookings`: `tenant_id`, `professional_id`, `service_id`, `customer_id`, `period tstzrange`, `status`.
-- `customers` (por estabelecimento: nome, e-mail, telefone — o mínimo, ver LGPD em seguranca.md).
+- `bookings`: `tenant_id`, `professional_id`, `service_id`, `customer_id`, `starts_at`/`ends_at` (o atendimento),
+  `blocked_until` (+ o preparo), `period tstzrange` gerado pelo banco de `[starts_at, blocked_until)`, `status`, preço,
+  duração e preparo copiados do serviço na hora de agendar.
+- `customers` (por estabelecimento: nome, telefone só com dígitos e único no estabelecimento, e-mail opcional — o
+  mínimo, ver LGPD em seguranca.md). Criado com `INSERT ... ON CONFLICT DO NOTHING`: seguro com pedidos simultâneos.
 - `waitlist_entries`, `outbox_events`, `processed_events` (idempotência do worker).
 
 **Isolamento entre estabelecimentos** em três camadas: o guard de acesso na API, chaves estrangeiras compostas
@@ -69,15 +72,20 @@ token). A partir da fase 1 a regra fica mais estrita (pendências da revisão da
 
 1. **No banco (garantia definitiva):**
    ```sql
-   EXCLUDE USING gist (professional_id WITH =, period WITH &&) WHERE (status IN ('PENDING', 'CONFIRMED'))
+   EXCLUDE USING gist (professional_id WITH =, period WITH &&)
+       WHERE (status IN ('PENDING', 'CONFIRMED', 'COMPLETED', 'NO_SHOW'))
    ```
-   Dois agendamentos ativos sobrepostos para o mesmo profissional são impossíveis, com qualquer número de instâncias
-   e de requisições simultâneas. A violação vira `409 Conflict` com mensagem clara (ADR-002).
+   Dois agendamentos que ocupam o horário (ADR-009) sobrepostos para o mesmo profissional são impossíveis — o período inclui o
+   preparo depois do atendimento —, com qualquer número de instâncias e de requisições simultâneas. Criar agendamento
+   não usa a trava de escrita do estabelecimento: quem decide é o banco. A violação vira `409 Time slot not available`
+   (ADR-002). Depende da extensão `btree_gist`, criada pelo superusuário (`deploy/db-init/02-extensions.sh`; em banco
+   existente, rode o db-init de novo antes de subir a API — README e teste de upgrade do CI).
 2. **Reserva temporária no Redis (experiência do cliente):** ao escolher o horário, `SET reserva:{prof}:{inicio} {id}
    NX PX 300000` segura a vaga por 5 min enquanto o cliente confirma. Não substitui a restrição do banco: só evita que
    dois clientes preencham o formulário para o mesmo horário.
 
-Teste obrigatório: 100 requisições simultâneas para o mesmo horário → exatamente 1 agendamento criado, 99 recebem 409.
+Teste obrigatório: 100 requisições simultâneas para o mesmo horário → exatamente 1 agendamento criado, 99 recebem 409
+(`BookingIntegrationTest.hundredConcurrentRequests`; sem a restrição, o teste falha).
 
 ## Eventos: padrão outbox
 
@@ -114,9 +122,15 @@ certa — sem `@Scheduled` que rodaria em todas as instâncias ao mesmo tempo.
 - Pool de conexões dimensionado e medido; índices definidos junto com cada consulta (e testados com `EXPLAIN` nos
   casos críticos).
 - Leitura mais frequente (horários livres da página pública) com cache curto no Redis, invalidado pelos eventos de
-  agendamento e de expediente. Pendente para a fase 2: a troca de expediente e a criação/remoção de bloqueio ainda não
-  geram evento (entram pelo outbox junto com o cache), e os horários livres fazem ~9 idas ao banco (catálogo e fuso
-  podem vir numa consulta só).
+  agendamento e de expediente. Pendente para a fase 2: a troca de expediente, a criação/remoção de bloqueio, a criação
+  de agendamento e a mudança de status ainda não geram evento (entram pelo outbox junto com o cache; na mudança de
+  status, só quando o `UPDATE` condicional alterou a linha), e os horários livres e a criação de agendamento fazem
+  idas ao banco evitáveis (catálogo numa consulta só, cliente num comando só).
+- Espera por trava é curta: `lock_timeout` de 3 s em toda conexão (trava de escrita do estabelecimento, horário em
+  disputa na restrição de exclusão, cliente sendo criado) → 503 "Busy, try again", sem segurar a conexão; pool do
+  Hikari com 20 conexões e 5 s de espera (medir com o teste de carga).
+- Agendamentos: agenda de até 7 dias com teto de 500 itens (`truncated`; ativos antes dos cancelados) e até 1000
+  criados por estabelecimento em 24 h. Clientes ainda não têm listagem; crescem no ritmo dos agendamentos.
 - Redis com timeout curto (200 ms): lento ou fora, o limite por IP é pulado (com aviso no log), nunca trava a API.
 
 ### Pendências registradas na revisão da fase 0 (para a fase 1)

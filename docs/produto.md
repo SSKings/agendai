@@ -32,6 +32,12 @@ hora que deixam a cadeira vazia.
 - **Política:** antecedência mínima para agendar, até quantas horas antes o cliente pode cancelar sozinho, quantos
   dias à frente a agenda abre.
 
+**Agendamento manual (painel):** qualquer pessoa da equipe escolhe um horário livre e informa nome, telefone (com DDD)
+e, se quiser, e-mail e observação; o mesmo telefone é o mesmo cliente. Precisa caber no expediente, fora dos
+bloqueios, de hoje (a partir de agora) até 180 dias; horário que não existe ou se repete na troca de horário de verão
+é recusado. Telefone já cadastrado com outro nome é recusado (confira o número ou use o nome do cadastro). Na agenda do dia ou da semana: atendido e falta só depois do
+início; cancelar libera o horário; status finais não mudam.
+
 **Critérios de aceite:** horários livres respeitam expediente, bloqueios, duração + preparo e agendamentos
 existentes; mudar o expediente não apaga agendamentos já feitos (eles aparecem como "fora do expediente" para
 decisão do dono).

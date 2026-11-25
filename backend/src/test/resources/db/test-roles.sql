@@ -7,3 +7,5 @@ ALTER SCHEMA public OWNER TO agendai_owner;
 GRANT USAGE ON SCHEMA public TO agendai_app;
 ALTER DEFAULT PRIVILEGES FOR ROLE agendai_owner IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO agendai_app;
 ALTER DEFAULT PRIVILEGES FOR ROLE agendai_owner IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO agendai_app;
+-- Extensões criadas pelo superusuário, como em deploy/db-init/02-extensions.sh (o dono não tem CREATE no banco)
+CREATE EXTENSION IF NOT EXISTS btree_gist;

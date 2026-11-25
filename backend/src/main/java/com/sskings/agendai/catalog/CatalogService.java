@@ -28,6 +28,10 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class CatalogService {
 
+    /** Limites de um serviço (também CHECK em services, V2); a agenda deriva deles a duração máxima de um agendamento. */
+    public static final int MAX_DURATION = 480;
+    public static final int MAX_BUFFER = 120;
+
     static final int MAX_SERVICES = 100;
     static final int MAX_PROFESSIONALS = 50;
 
@@ -137,7 +141,7 @@ public class CatalogService {
     // ---------- para outros módulos (agenda) ----------
 
     /** O que a agenda precisa de um serviço feito por um profissional; {@code bookable}: os dois estão ativos. */
-    public record Offer(int durationMinutes, int bufferMinutes, boolean bookable) {}
+    public record Offer(int durationMinutes, int bufferMinutes, int priceCents, boolean bookable) {}
 
     static final String NOT_PERFORMED = "Professional does not perform this service";
 
@@ -158,7 +162,7 @@ public class CatalogService {
         if (!links.existsByTenantIdAndId(tenantId, new ProfessionalService.Link(professionalId, serviceId))) {
             throw ApiException.badRequest(NOT_PERFORMED);
         }
-        return new Offer(s.getDurationMinutes(), s.getBufferMinutes(), p.isActive() && s.isActive());
+        return new Offer(s.getDurationMinutes(), s.getBufferMinutes(), s.getPriceCents(), p.isActive() && s.isActive());
     }
 
     private Professional professional(UUID tenantId, UUID id) {

@@ -43,6 +43,17 @@ Pilha de produção (nginx com TLS, API, PostgreSQL, Redis), como o CI sobe: vej
 [deploy/docker-compose.prod.yml](deploy/docker-compose.prod.yml) e o teste ponta a ponta
 [deploy/e2e-smoke.py](deploy/e2e-smoke.py).
 
+**Atualizando um banco que já existe** (produção ou o volume de dev): o PostgreSQL só roda `deploy/db-init` com o
+volume vazio, e algumas migrações dependem do que esses scripts criam (papéis, extensões como `btree_gist`). Antes de
+subir a API nova, rode-os de novo — são idempotentes, e é o que o CI faz no teste de upgrade:
+
+```bash
+docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env.prod up -d --wait db
+docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env.prod exec -T db \
+  sh -c 'for f in /docker-entrypoint-initdb.d/*.sh; do bash "$f" || exit 1; done'
+# dev: docker compose -f backend/compose.yaml exec -T postgres sh -c '…mesmo laço…'
+```
+
 ## Stack
 
 **Backend:** Java 17 · Spring Boot 4 · Spring Security · Spring Data JPA · Flyway · PostgreSQL (com RLS) · Redis ·

@@ -122,6 +122,20 @@ def main():
     check("horários livres: expediente, bloqueio e atendimento + preparo (35 min) na hora local",
           s == 200 and [x[11:16] for x in av["slots"]] == ["09:30", "09:45", "10:00", "10:15"]
           and all(x.startswith(f"{day}T") for x in av["slots"]), av)
+    # ---- agendamento (fase 1c): o horário some dos livres; o mesmo horário de novo é 409; cancelar libera ----
+    req = {"professionalId": pro["id"], "serviceId": svc["id"], "start": f"{day}T09:30",
+           "customer": {"name": "Cliente Teste", "phone": "(11) 90000-0000"}}
+    s, bk, _ = call("POST", base + "/bookings", ana["accessToken"], req)
+    check("agendamento manual no horário livre", s == 201 and bk["status"] == "CONFIRMED" and bk["start"][11:16] == "09:30", bk)
+    check("o mesmo horário de novo: 409", call("POST", base + "/bookings", ana["accessToken"], req)[0] == 409)
+    s, av, _ = call("GET", f"{base}/availability?professionalId={pro['id']}&serviceId={svc['id']}&date={day}", ana["accessToken"])
+    check("o horário agendado (com o preparo) sai dos livres", s == 200 and [x[11:16] for x in av["slots"]] == ["10:15"], av)
+    s, ag, _ = call("GET", f"{base}/bookings?from={day}&to={day}", ana["accessToken"])
+    check("aparece na agenda do dia", s == 200 and [b["id"] for b in ag["bookings"]] == [bk["id"]], ag)
+    s, _, _ = call("PATCH", f"{base}/bookings/{bk['id']}", ana["accessToken"], {"status": "CANCELLED"})
+    check("cancelar libera o horário", s == 200 and call("POST", base + "/bookings", ana["accessToken"], req)[0] == 201, s)
+    check("agenda da Ana: 404 para outro dono",
+          call("GET", f"{base}/bookings?from={day}&to={day}", eve["accessToken"])[0] == 404)
     check("bloqueios da Ana: 404 para outro dono", call("GET", f"{base}/time-off?from={day}&to={day}", eve["accessToken"])[0] == 404)
     eve_base = f"/api/tenants/{call('GET', '/api/me', eve['accessToken'])[1]['tenants'][0]['id']}"
     s, theirs, _ = call("GET", f"{eve_base}/time-off?from={day}&to={day}", eve["accessToken"])

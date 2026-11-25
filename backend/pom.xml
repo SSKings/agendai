@@ -229,6 +229,7 @@
 						<param>com.sskings.agendai.auth.*</param>
 						<param>com.sskings.agendai.catalog.*</param>
 						<param>com.sskings.agendai.schedule.*</param>
+						<param>com.sskings.agendai.booking.*</param>
 						<param>com.sskings.agendai.tenant.TenantAccess</param>
 						<param>com.sskings.agendai.config.ProductionConfigValidator*</param>
 					</targetClasses>
@@ -237,6 +238,7 @@
 						<param>com.sskings.agendai.auth.*Test</param>
 						<param>com.sskings.agendai.catalog.*Test</param>
 						<param>com.sskings.agendai.schedule.*Test</param>
+						<param>com.sskings.agendai.booking.*Test</param>
 						<param>com.sskings.agendai.config.ProductionConfigValidatorTest</param>
 					</targetTests>
 					<excludedTestClasses>

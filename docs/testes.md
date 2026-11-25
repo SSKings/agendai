@@ -16,7 +16,10 @@
 4. **Teste de mutação (PIT)** no domínio e na segurança: mínimo de **95%** dos defeitos injetados pegos. Os
    sobreviventes restantes precisam ser equivalentes (não mudam comportamento) e são revisados a cada fase. Hoje o
    alvo é `security`, `auth`, `catalog`, `schedule`, `booking`, o guard `TenantAccess` e o validador de produção; as regras que dependem do
-   banco rodam a mutação com os testes de integração do pacote.
+   banco rodam a mutação com os testes de integração do pacote. No CI a mutação fica fora do job do Backend e é
+   dividida por área (segurança; catálogo e agenda; agendamentos), em jobs paralelos, cada um exigindo 95%: com tudo
+   num job só passou de 35 min. Localmente, `./mvnw pitest:mutationCoverage` roda tudo; uma área só com
+   `-DtargetClasses=... -DtargetTests=...` (os valores estão no ci.yml).
 5. **Correção de bug começa por um teste que reproduz o bug** e falha no código antigo.
 6. Testes rodam com a **JVM em UTC** (como o CI e o servidor).
 

@@ -19,6 +19,9 @@ spring:
       ddl-auto: validate         # o esquema é só do Flyway
     properties:
       hibernate.jdbc.time_zone: UTC
+      hibernate.jdbc.batch_size: 50          # vínculos e cadastros em lote: uma ida ao banco por lote, não por linha
+      hibernate.order_inserts: true
+      hibernate.order_updates: true
   flyway:
     enabled: true
     # migrações com o DONO das tabelas; a API (spring.datasource.username) só tem DML (docs/seguranca.md)

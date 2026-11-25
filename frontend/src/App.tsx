@@ -6,6 +6,9 @@ import { AccountPage } from './pages/AccountPage'
 import { HomePage } from './pages/HomePage'
 import { LoginPage } from './pages/LoginPage'
 import { RegisterPage } from './pages/RegisterPage'
+import { ServicesPage } from './pages/ServicesPage'
+import { TeamPage } from './pages/TeamPage'
+import { TenantLayout } from './pages/TenantLayout'
 
 /** Libera a rota só no estado pedido: área logada exige sessão; entrar/cadastro só sem sessão. */
 function Gate({ need, children }: { need: Exclude<Status, 'loading'>; children: ReactNode }) {
@@ -24,6 +27,11 @@ export function App() {
         <Route element={<Gate need="in"><Layout /></Gate>}>
           <Route index element={<HomePage />} />
           <Route path="conta" element={<AccountPage />} />
+          <Route path="e/:tenantId" element={<TenantLayout />}>
+            <Route index element={<Navigate to="servicos" replace />} />
+            <Route path="servicos" element={<ServicesPage />} />
+            <Route path="equipe" element={<TeamPage />} />
+          </Route>
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

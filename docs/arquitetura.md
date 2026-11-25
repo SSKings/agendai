@@ -34,7 +34,7 @@
 |---|---|
 | `user` | Identidade da equipe (conta, senha, versão dos tokens); `/api/me` |
 | `tenant` | Estabelecimento, equipe, convites, papéis (`OWNER` dono, `PROFESSIONAL` profissional) |
-| `catalog` | Serviços e quem faz cada um |
+| `catalog` | Serviços (duração, intervalo, preço em centavos) e profissionais com os serviços que cada um faz; até 100 serviços e 50 profissionais por estabelecimento (listas sempre limitadas) |
 | `schedule` | Expediente, bloqueios, cálculo de horários livres |
 | `booking` | Agendamentos (criar, cancelar, remarcar, atendido, falta), reservas temporárias |
 | `publicbooking` | Rotas públicas do cliente (sem login), verificação por código, links pessoais |
@@ -101,7 +101,8 @@ certa — sem `@Scheduled` que rodaria em todas as instâncias ao mesmo tempo.
 - API e worker sem estado: escalam horizontalmente; nenhum dado de uma requisição fica só na memória de uma instância.
 - Limite por IP e reservas no **Redis** (compartilhados entre instâncias), não em mapas locais.
 - Jobs com trava no banco (`SKIP LOCKED`) ou no Redis: rodam uma vez, não uma por instância.
-- Consultas sempre paginadas; nenhuma rota devolve lista sem limite.
+- Nenhuma rota devolve lista sem limite: ou é paginada, ou tem teto fixo por estabelecimento (catálogo: 100 serviços e
+  50 profissionais), garantido com a trava de escrita por estabelecimento (`DbSession.lockTenant`).
 - Pool de conexões dimensionado e medido; índices definidos junto com cada consulta (e testados com `EXPLAIN` nos
   casos críticos).
 - Leitura mais frequente (horários livres da página pública) com cache curto no Redis, invalidado pelos eventos de

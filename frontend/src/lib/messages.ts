@@ -15,6 +15,15 @@ const MESSAGES: Record<string, string> = {
   'Validation failed': 'Confira os campos.',
   'Tenant not found': 'Estabelecimento não encontrado.',
   'Request body too large': 'Os dados enviados são grandes demais.',
+  'Only owners can do this': 'Só o dono do estabelecimento pode fazer isso.',
+  'Service not found': 'Serviço não encontrado.',
+  'Service name already in use': 'Já existe um serviço com esse nome.',
+  'Service limit reached': 'Limite de serviços atingido.',
+  'Professional not found': 'Profissional não encontrado.',
+  'Professional name already in use': 'Já existe um profissional com esse nome.',
+  'Professional limit reached': 'Limite de profissionais atingido.',
+  'Unknown service': 'Algum serviço escolhido não existe mais. Recarregue a página.',
+  'Durations must be multiples of 5 minutes': 'Duração e intervalo vão de 5 em 5 minutos.',
 }
 
 export const GENERIC_ERROR = 'Algo deu errado. Tente de novo.'

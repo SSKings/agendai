@@ -36,3 +36,20 @@ export function Submit({ busy, children }: { busy: boolean; children: ReactNode 
     </button>
   )
 }
+
+export function Check({ label, ...input }: { label: string } & InputHTMLAttributes<HTMLInputElement>) {
+  return (
+    <label className="flex items-center gap-2 text-sm text-slate-700">
+      <input type="checkbox" {...input} className="h-4 w-4 rounded border-slate-300 text-indigo-600" />
+      {label}
+    </label>
+  )
+}
+
+export function Button({ children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <button type="button" {...props} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
+      {children}
+    </button>
+  )
+}

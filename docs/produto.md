@@ -21,6 +21,8 @@ hora que deixam a cadeira vazia.
 - Cadastro do estabelecimento: nome, link público (slug), fuso horário, endereço, contato.
 - **Serviços:** nome, duração (múltiplos de 5 min), preço, intervalo de preparo após o atendimento, ativo/inativo.
 - **Profissionais:** quem faz quais serviços; convite por link de uso único para entrar na equipe.
+- Limites por estabelecimento: até 100 serviços e 50 profissionais (cobre com folga o público-alvo; evita listas sem
+  limite).
 - **Expediente:** horários por dia da semana e por profissional; feriados e bloqueios pontuais.
 - **Política:** antecedência mínima para agendar, até quantas horas antes o cliente pode cancelar sozinho, quantos
   dias à frente a agenda abre.

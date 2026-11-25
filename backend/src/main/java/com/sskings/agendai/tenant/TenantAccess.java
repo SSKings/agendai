@@ -20,6 +20,7 @@ import java.util.UUID;
 public class TenantAccess {
 
     static final String NOT_FOUND = "Tenant not found";
+    static final String OWNERS_ONLY = "Only owners can do this";
 
     private final MembershipRepository memberships;
     private final DbSession db;
@@ -30,5 +31,15 @@ public class TenantAccess {
                 .orElseThrow(() -> ApiException.notFound(NOT_FOUND));
         db.enterTenant(tenantId);
         return m;
+    }
+
+    /**
+     * Como {@link #member}, e só o dono passa (403 para o resto da equipe). Escritas do estabelecimento ficam em fila
+     * até o fim da transação (ver {@link DbSession#lockTenant}).
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void owner(UUID tenantId) {
+        if (member(tenantId).getRole() != Role.OWNER) throw ApiException.forbidden(OWNERS_ONLY);
+        db.lockTenant(tenantId);
     }
 }

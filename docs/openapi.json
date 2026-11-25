@@ -67,6 +67,53 @@
         "required" : [ "email", "id", "name", "tenants" ],
         "type" : "object"
       },
+      "ProfessionalRequest" : {
+        "properties" : {
+          "active" : {
+            "type" : "boolean"
+          },
+          "name" : {
+            "maxLength" : 100,
+            "minLength" : 0,
+            "pattern" : "^[^\\p{Cntrl}\\u2028\\u2029]*$",
+            "type" : "string"
+          },
+          "serviceIds" : {
+            "items" : {
+              "format" : "uuid",
+              "type" : "string"
+            },
+            "maxItems" : 100,
+            "minItems" : 0,
+            "type" : "array"
+          }
+        },
+        "required" : [ "active", "name", "serviceIds" ],
+        "type" : "object"
+      },
+      "ProfessionalView" : {
+        "properties" : {
+          "active" : {
+            "type" : "boolean"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "serviceIds" : {
+            "items" : {
+              "format" : "uuid",
+              "type" : "string"
+            },
+            "type" : "array"
+          }
+        },
+        "required" : [ "active", "id", "name", "serviceIds" ],
+        "type" : "object"
+      },
       "RegisterRequest" : {
         "properties" : {
           "businessName" : {
@@ -95,6 +142,67 @@
           }
         },
         "required" : [ "businessName", "email", "name", "password" ],
+        "type" : "object"
+      },
+      "ServiceRequest" : {
+        "properties" : {
+          "active" : {
+            "type" : "boolean"
+          },
+          "bufferMinutes" : {
+            "format" : "int32",
+            "maximum" : 120,
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "durationMinutes" : {
+            "format" : "int32",
+            "maximum" : 480,
+            "minimum" : 5,
+            "type" : "integer"
+          },
+          "name" : {
+            "maxLength" : 100,
+            "minLength" : 0,
+            "pattern" : "^[^\\p{Cntrl}\\u2028\\u2029]*$",
+            "type" : "string"
+          },
+          "priceCents" : {
+            "format" : "int32",
+            "maximum" : 10000000,
+            "minimum" : 0,
+            "type" : "integer"
+          }
+        },
+        "required" : [ "active", "bufferMinutes", "durationMinutes", "name", "priceCents" ],
+        "type" : "object"
+      },
+      "ServiceView" : {
+        "properties" : {
+          "active" : {
+            "type" : "boolean"
+          },
+          "bufferMinutes" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "durationMinutes" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "priceCents" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "active", "bufferMinutes", "durationMinutes", "id", "name", "priceCents" ],
         "type" : "object"
       },
       "TenantView" : {
@@ -315,6 +423,226 @@
           }
         },
         "tags" : [ "tenant-controller" ]
+      }
+    },
+    "/api/tenants/{tenantId}/professionals" : {
+      "get" : {
+        "operationId" : "professionals",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "tenantId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/ProfessionalView"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "catalog-controller" ]
+      },
+      "post" : {
+        "operationId" : "createProfessional",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "tenantId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ProfessionalRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProfessionalView"
+                }
+              }
+            },
+            "description" : "Created"
+          }
+        },
+        "tags" : [ "catalog-controller" ]
+      }
+    },
+    "/api/tenants/{tenantId}/professionals/{id}" : {
+      "put" : {
+        "operationId" : "updateProfessional",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "tenantId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ProfessionalRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProfessionalView"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "catalog-controller" ]
+      }
+    },
+    "/api/tenants/{tenantId}/services" : {
+      "get" : {
+        "operationId" : "services",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "tenantId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/ServiceView"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "catalog-controller" ]
+      },
+      "post" : {
+        "operationId" : "createService",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "tenantId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ServiceRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ServiceView"
+                }
+              }
+            },
+            "description" : "Created"
+          }
+        },
+        "tags" : [ "catalog-controller" ]
+      }
+    },
+    "/api/tenants/{tenantId}/services/{id}" : {
+      "put" : {
+        "operationId" : "updateService",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "tenantId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ServiceRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ServiceView"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "catalog-controller" ]
       }
     }
   }

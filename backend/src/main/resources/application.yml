@@ -13,6 +13,13 @@ spring:
     url: ${DATABASE_URL:}
     username: ${DATABASE_USERNAME:}
     password: ${DATABASE_PASSWORD:}
+    hikari:
+      # fila curta em vez de 30 s de espera por conexão; medir com o teste de carga antes de mexer
+      maximum-pool-size: ${DATABASE_POOL_SIZE:20}
+      connection-timeout: 5000
+      # quem espera trava (escrita do mesmo estabelecimento, horário em disputa na restrição de exclusão, mesmo
+      # cliente sendo criado) desiste em 3 s com 503, em vez de segurar a conexão indefinidamente
+      connection-init-sql: SET lock_timeout = '3s'
   jpa:
     open-in-view: false          # nada de consulta escondida na renderização do JSON
     hibernate:

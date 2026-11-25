@@ -132,6 +132,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/tenants/{tenantId}/bookings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["agenda"];
+        put?: never;
+        post: operations["create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tenants/{tenantId}/bookings/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["changeStatus"];
+        trace?: never;
+    };
     "/api/tenants/{tenantId}/professionals": {
         parameters: {
             query?: never;
@@ -248,6 +280,10 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AgendaView: {
+            bookings: components["schemas"]["BookingView"][];
+            truncated: boolean;
+        };
         AuthResponse: {
             accessToken: string;
             user: components["schemas"]["UserView"];
@@ -258,9 +294,54 @@ export interface components {
             slots: string[];
             timeZone: string;
         };
+        BookingRequest: {
+            customer: components["schemas"]["CustomerInput"];
+            note?: string;
+            /** Format: uuid */
+            professionalId: string;
+            /** Format: uuid */
+            serviceId: string;
+            /**
+             * Format: local-date-time
+             * @example 2026-11-30T09:15
+             */
+            start: string;
+        };
+        BookingView: {
+            customer: components["schemas"]["CustomerView"];
+            /** Format: date-time */
+            end: string;
+            /** Format: uuid */
+            id: string;
+            note?: string | null;
+            outsideHours: boolean;
+            /** Format: int32 */
+            priceCents: number;
+            /** Format: uuid */
+            professionalId: string;
+            /** Format: uuid */
+            serviceId: string;
+            /** Format: date-time */
+            start: string;
+            /** @enum {string} */
+            status: "CONFIRMED" | "COMPLETED" | "NO_SHOW" | "CANCELLED";
+        };
         ChangePasswordRequest: {
             currentPassword: string;
             newPassword: string;
+        };
+        CustomerInput: {
+            /** Format: email */
+            email?: string;
+            name: string;
+            phone: string;
+        };
+        CustomerView: {
+            email?: string | null;
+            /** Format: uuid */
+            id: string;
+            name: string;
+            phone: string;
         };
         LoginRequest: {
             email: string;
@@ -313,6 +394,10 @@ export interface components {
             name: string;
             /** Format: int32 */
             priceCents: number;
+        };
+        StatusRequest: {
+            /** @enum {string} */
+            status: "CONFIRMED" | "COMPLETED" | "NO_SHOW" | "CANCELLED";
         };
         TenantView: {
             /** Format: uuid */
@@ -554,6 +639,85 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["AvailabilityView"];
+                };
+            };
+        };
+    };
+    agenda: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                professionalId?: string;
+            };
+            header?: never;
+            path: {
+                tenantId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AgendaView"];
+                };
+            };
+        };
+    };
+    create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenantId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BookingRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["BookingView"];
+                };
+            };
+        };
+    };
+    changeStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenantId: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StatusRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["BookingView"];
                 };
             };
         };

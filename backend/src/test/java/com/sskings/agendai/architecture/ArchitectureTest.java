@@ -58,6 +58,14 @@ class ArchitectureTest {
     }
 
     @Test
+    @DisplayName("Agenda, catálogo e estabelecimento não dependem dos agendamentos: booking usa os outros, nunca o contrário (ADR-008)")
+    void scheduleDoesNotDependOnBooking() {
+        noClasses().that().resideInAnyPackage("..schedule..", "..catalog..", "..tenant..")
+                .should().dependOnClassesThat().resideInAPackage("..booking..")
+                .check(APP);
+    }
+
+    @Test
     @DisplayName("Repositório de usuários só é usado pelos módulos de usuário, autenticação e segurança")
     void userRepositoryUsage() {
         classes().that().areAssignableTo(Repository.class).and().resideInAPackage("..user..")

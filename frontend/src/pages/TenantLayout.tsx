@@ -14,6 +14,7 @@ export function TenantLayout() {
     <section>
       <h1 className="text-2xl font-semibold text-slate-900">{tenant.name}</h1>
       <nav aria-label="Seções do estabelecimento" className="mt-3 flex flex-wrap gap-2">
+        <NavLink to="agenda" className={tab}>Agenda</NavLink>
         <NavLink to="servicos" className={tab}>Serviços</NavLink>
         <NavLink to="equipe" className={tab}>Equipe</NavLink>
         <NavLink to="expediente" className={tab}>Expediente</NavLink>

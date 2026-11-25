@@ -47,6 +47,15 @@ Corrigido na mesma revisão: a política de INSERT em `memberships` aceitava o p
 estabelecimento (um bug futuro que deixasse o `tenant_id` vir do cliente bastaria). Agora só entra quem cria um
 estabelecimento ainda sem membros; teste `RowLevelSecurityTest.cannotJoinForeignTenant`.
 
+Fase 1c (agendamentos): horário duplo impossível no banco (restrição de exclusão, teste com 100 pedidos simultâneos);
+RLS e FKs compostas também em `bookings` e `customers` (`BookingRowLevelSecurityTest`). Revisão: teto de 1000
+agendamentos criados por estabelecimento em 24 h (criar e cancelar em laço não enche o banco); telefone já cadastrado
+com outro nome é 409 sem revelar o nome (não vira consulta "telefone → cliente"); mudança de status atômica (dois
+pedidos simultâneos não se sobrescrevem); `@PlainText` passa a barrar também controles fora do ASCII (NEL) e
+caracteres invisíveis de formatação (inversão de sentido), e vale para o e-mail do cliente. Enquanto o convite da equipe
+(1d) não existe, qualquer membro agenda e muda status de qualquer profissional; a 1d restringe o profissional à
+própria agenda.
+
 Revisão da fase 1b (agenda): datas fora de uma janela razoável (listagem de 1 ano para trás a 2 para a frente; bloqueio
 terminando em até 2 anos) viram 400 em vez de 500 com stack no log, e nenhum bloqueio "eterno" ocupa o teto dos
 futuros; os horários livres só leem bloqueios ainda não terminados (no máximo 200), por maior que seja o histórico.

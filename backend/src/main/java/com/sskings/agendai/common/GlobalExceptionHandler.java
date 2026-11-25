@@ -3,6 +3,7 @@ package com.sskings.agendai.common;
 import com.sskings.agendai.security.RequestSizeLimitFilter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -69,6 +70,17 @@ public class GlobalExceptionHandler {
     ResponseEntity<ErrorResponse> conflict(DataIntegrityViolationException ex) {
         log.warn("Conflito de integridade: {}", ex.getMostSpecificCause().getClass().getSimpleName());
         return error(HttpStatus.CONFLICT, "Conflict with existing data");
+    }
+
+    /**
+     * lock_timeout estourou (application.yml): o recurso está ocupado agora; o cliente pode tentar de novo. Vem
+     * traduzida pelo Spring (repositórios) ou crua do JPA (consulta nativa, ex.: a trava do estabelecimento).
+     */
+    @ExceptionHandler({PessimisticLockingFailureException.class, jakarta.persistence.PessimisticLockException.class,
+            jakarta.persistence.LockTimeoutException.class})
+    ResponseEntity<ErrorResponse> busy(Exception ex) {
+        log.warn("Espera por trava excedida: {}", ex.getClass().getSimpleName());
+        return error(HttpStatus.SERVICE_UNAVAILABLE, "Busy, try again");
     }
 
     @ExceptionHandler(NoResourceFoundException.class)

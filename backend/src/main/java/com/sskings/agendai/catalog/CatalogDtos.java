@@ -17,8 +17,8 @@ public final class CatalogDtos {
 
     public record ServiceRequest(
             @NotBlank @Size(max = 100) @PlainText String name,
-            @NotNull @Min(5) @Max(480) Integer durationMinutes,
-            @NotNull @Min(0) @Max(120) Integer bufferMinutes,
+            @NotNull @Min(5) @Max(CatalogService.MAX_DURATION) Integer durationMinutes,
+            @NotNull @Min(0) @Max(CatalogService.MAX_BUFFER) Integer bufferMinutes,
             @NotNull @Min(0) @Max(10_000_000) Integer priceCents,
             @NotNull Boolean active) {
         public ServiceRequest {

@@ -29,3 +29,14 @@ export function timeOf(slot: string): string {
 /** O campo de hora do navegador não aceita 24:00: na tela, o fim do dia é 00:00. */
 export const toInput = (hhmm: string) => (hhmm === '24:00' ? '00:00' : hhmm)
 export const fromEndInput = (hhmm: string) => (hhmm === '00:00' ? '24:00' : hhmm)
+
+const WEEKDAY_SHORT = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado']
+
+/** "2026-11-30" → "segunda, 30/11" (sem fuso: é uma data do calendário). */
+export function formatDay(date: string): string {
+  const [, m, d] = date.split('-')
+  return `${WEEKDAY_SHORT[new Date(`${date}T00:00:00Z`).getUTCDay()]}, ${d}/${m}`
+}
+
+/** Data local de um instante com deslocamento ("2026-11-30T23:00:00-03:00" → "2026-11-30"). */
+export const dayOf = (offsetDateTime: string) => offsetDateTime.slice(0, 10)

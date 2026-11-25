@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider, useAuth, type Status } from './auth/AuthContext'
 import { Layout } from './components/Layout'
 import { AccountPage } from './pages/AccountPage'
+import { AgendaPage } from './pages/AgendaPage'
 import { AvailabilityPage } from './pages/AvailabilityPage'
 import { HomePage } from './pages/HomePage'
 import { HoursPage } from './pages/HoursPage'
@@ -32,6 +33,7 @@ export function App() {
           <Route path="conta" element={<AccountPage />} />
           <Route path="e/:tenantId" element={<TenantLayout />}>
             <Route index element={<Navigate to="servicos" replace />} />
+            <Route path="agenda" element={<AgendaPage />} />
             <Route path="servicos" element={<ServicesPage />} />
             <Route path="equipe" element={<TeamPage />} />
             <Route path="expediente" element={<HoursPage />} />

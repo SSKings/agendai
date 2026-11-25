@@ -5,6 +5,7 @@ import com.auth0.jwt.algorithms.Algorithm;
 import com.sskings.agendai.support.IntegrationTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.mock.web.MockHttpServletResponse;
 
@@ -141,5 +142,42 @@ class SecurityHardeningIntegrationTest extends IntegrationTest {
         }
         assertThat(call(post("/api/auth/logout"), null, null).getStatus()).isEqualTo(401);
         assertThat(call(put("/api/me/password"), null, Map.of("currentPassword", "x", "newPassword", "y")).getStatus()).isEqualTo(401);
+    }
+
+    @Test
+    @DisplayName("Autenticação presente mas não confirmada: 403 genérico do tratador de acesso negado, sem detalhe")
+    void accessDeniedHandler() throws Exception {
+        var context = new org.springframework.security.core.context.SecurityContextImpl(
+                new org.springframework.security.authentication.UsernamePasswordAuthenticationToken("alguém", null));
+        MockHttpServletResponse r = call(get("/api/me").requestAttr(
+                org.springframework.security.web.context.RequestAttributeSecurityContextRepository.DEFAULT_REQUEST_ATTR_NAME, context), null, null);
+        assertThat(r.getStatus()).isEqualTo(403);
+        assertThat(r.getContentAsString()).contains("\"message\":\"Access denied\"").doesNotContain("alguém");
+    }
+
+    @Autowired private org.testcontainers.postgresql.PostgreSQLContainer postgres;
+
+    @Test
+    @DisplayName("Trava presa por outra transação: a escrita desiste em ~3 s com 503 (lock_timeout), sem segurar a conexão")
+    void lockTimeout() throws Exception {
+        Session ana = register();
+        try (var other = java.sql.DriverManager.getConnection(postgres.getJdbcUrl(), "agendai_owner", "owner-test")) {
+            other.setAutoCommit(false);
+            try (var st = other.prepareStatement("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))")) {
+                st.setString(1, ana.tenantId());
+                st.execute();
+            }
+            long t0 = System.nanoTime();
+            MockHttpServletResponse r = call(post("/api/tenants/" + ana.tenantId() + "/services"), ana.token(),
+                    Map.of("name", "Corte", "durationMinutes", 30, "bufferMinutes", 0, "priceCents", 0, "active", true));
+            long ms = (System.nanoTime() - t0) / 1_000_000;
+            assertThat(r.getStatus()).as(r.getContentAsString()).isEqualTo(503);
+            assertThat(r.getContentAsString()).contains("Busy, try again");
+            assertThat(ms).isBetween(2_500L, 8_000L);
+            other.rollback();
+        }
+        assertThat(call(post("/api/tenants/" + ana.tenantId() + "/services"), ana.token(),
+                Map.of("name", "Corte", "durationMinutes", 30, "bufferMinutes", 0, "priceCents", 0, "active", true)).getStatus())
+                .as("trava solta: volta ao normal").isEqualTo(201);
     }
 }

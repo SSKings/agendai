@@ -157,10 +157,14 @@ jobs:
           python3 ../base/deploy/e2e-smoke.py "$URL"
           sleep 61   # o nginx limita cadastro/login a 10 por minuto por IP
 
-      - name: Sobe a versão do PR (migrações sobre os dados existentes)
+      # Como num deploy de verdade: o banco sobe primeiro e os scripts de db-init (idempotentes: papéis, extensões)
+      # rodam de novo com o superusuário — o entrypoint só os roda com o volume vazio — antes de a API nova migrar.
+      - name: Sobe a versão do PR (db-init de novo, migrações sobre os dados existentes)
         run: |
-          docker compose -p "$PROJECT" -f deploy/docker-compose.prod.yml --env-file deploy/.env.prod \
-            up -d --build --wait --wait-timeout 300
+          compose() { docker compose -p "$PROJECT" -f deploy/docker-compose.prod.yml --env-file deploy/.env.prod "$@"; }
+          compose up -d --wait --wait-timeout 120 db
+          compose exec -T db sh -c 'for f in /docker-entrypoint-initdb.d/*.sh; do bash "$f" || exit 1; done'
+          compose up -d --build --wait --wait-timeout 300
 
       - name: Teste ponta a ponta (nginx TLS → API → PostgreSQL e Redis)
         run: |

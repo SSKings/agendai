@@ -1,6 +1,21 @@
 {
   "components" : {
     "schemas" : {
+      "AgendaView" : {
+        "properties" : {
+          "bookings" : {
+            "items" : {
+              "$ref" : "#/components/schemas/BookingView"
+            },
+            "type" : "array"
+          },
+          "truncated" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "bookings", "truncated" ],
+        "type" : "object"
+      },
       "AuthResponse" : {
         "properties" : {
           "accessToken" : {
@@ -33,6 +48,77 @@
         "required" : [ "date", "slots", "timeZone" ],
         "type" : "object"
       },
+      "BookingRequest" : {
+        "properties" : {
+          "customer" : {
+            "$ref" : "#/components/schemas/CustomerInput"
+          },
+          "note" : {
+            "maxLength" : 200,
+            "minLength" : 0,
+            "pattern" : "^[^\\p{Cc}\\p{Cf}\\u2028\\u2029]*$",
+            "type" : "string"
+          },
+          "professionalId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "serviceId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "start" : {
+            "example" : "2026-11-30T09:15",
+            "format" : "local-date-time",
+            "type" : "string"
+          }
+        },
+        "required" : [ "customer", "professionalId", "serviceId", "start" ],
+        "type" : "object"
+      },
+      "BookingView" : {
+        "properties" : {
+          "customer" : {
+            "$ref" : "#/components/schemas/CustomerView"
+          },
+          "end" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "note" : {
+            "type" : [ "string", "null" ]
+          },
+          "outsideHours" : {
+            "type" : "boolean"
+          },
+          "priceCents" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "professionalId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "serviceId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "start" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "status" : {
+            "enum" : [ "CONFIRMED", "COMPLETED", "NO_SHOW", "CANCELLED" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "customer", "end", "id", "outsideHours", "priceCents", "professionalId", "serviceId", "start", "status" ],
+        "type" : "object"
+      },
       "ChangePasswordRequest" : {
         "properties" : {
           "currentPassword" : {
@@ -47,6 +133,49 @@
           }
         },
         "required" : [ "currentPassword", "newPassword" ],
+        "type" : "object"
+      },
+      "CustomerInput" : {
+        "properties" : {
+          "email" : {
+            "format" : "email",
+            "maxLength" : 254,
+            "minLength" : 0,
+            "pattern" : "^[^\\p{Cc}\\p{Cf}\\u2028\\u2029]*$",
+            "type" : "string"
+          },
+          "name" : {
+            "maxLength" : 100,
+            "minLength" : 0,
+            "pattern" : "^[^\\p{Cc}\\p{Cf}\\u2028\\u2029]*$",
+            "type" : "string"
+          },
+          "phone" : {
+            "minLength" : 1,
+            "pattern" : "[0-9 ()+.\\-]{10,25}",
+            "type" : "string"
+          }
+        },
+        "required" : [ "name", "phone" ],
+        "type" : "object"
+      },
+      "CustomerView" : {
+        "properties" : {
+          "email" : {
+            "type" : [ "string", "null" ]
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "phone" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "id", "name", "phone" ],
         "type" : "object"
       },
       "LoginRequest" : {
@@ -95,7 +224,7 @@
           "name" : {
             "maxLength" : 100,
             "minLength" : 0,
-            "pattern" : "^[^\\p{Cntrl}\\u2028\\u2029]*$",
+            "pattern" : "^[^\\p{Cc}\\p{Cf}\\u2028\\u2029]*$",
             "type" : "string"
           },
           "serviceIds" : {
@@ -139,7 +268,7 @@
           "businessName" : {
             "maxLength" : 100,
             "minLength" : 0,
-            "pattern" : "^[^\\p{Cntrl}\\u2028\\u2029]*$",
+            "pattern" : "^[^\\p{Cc}\\p{Cf}\\u2028\\u2029]*$",
             "type" : "string"
           },
           "email" : {
@@ -152,7 +281,7 @@
           "name" : {
             "maxLength" : 100,
             "minLength" : 0,
-            "pattern" : "^[^\\p{Cntrl}\\u2028\\u2029]*$",
+            "pattern" : "^[^\\p{Cc}\\p{Cf}\\u2028\\u2029]*$",
             "type" : "string"
           },
           "password" : {
@@ -184,7 +313,7 @@
           "name" : {
             "maxLength" : 100,
             "minLength" : 0,
-            "pattern" : "^[^\\p{Cntrl}\\u2028\\u2029]*$",
+            "pattern" : "^[^\\p{Cc}\\p{Cf}\\u2028\\u2029]*$",
             "type" : "string"
           },
           "priceCents" : {
@@ -225,6 +354,16 @@
         "required" : [ "active", "bufferMinutes", "durationMinutes", "id", "name", "priceCents" ],
         "type" : "object"
       },
+      "StatusRequest" : {
+        "properties" : {
+          "status" : {
+            "enum" : [ "CONFIRMED", "COMPLETED", "NO_SHOW", "CANCELLED" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "status" ],
+        "type" : "object"
+      },
       "TenantView" : {
         "properties" : {
           "id" : {
@@ -262,7 +401,7 @@
           "reason" : {
             "maxLength" : 100,
             "minLength" : 0,
-            "pattern" : "^[^\\p{Cntrl}\\u2028\\u2029]*$",
+            "pattern" : "^[^\\p{Cc}\\p{Cf}\\u2028\\u2029]*$",
             "type" : "string"
           },
           "start" : {
@@ -591,6 +730,137 @@
           }
         },
         "tags" : [ "schedule-controller" ]
+      }
+    },
+    "/api/tenants/{tenantId}/bookings" : {
+      "get" : {
+        "operationId" : "agenda",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "tenantId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "from",
+          "required" : true,
+          "schema" : {
+            "format" : "date",
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "to",
+          "required" : true,
+          "schema" : {
+            "format" : "date",
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "professionalId",
+          "required" : false,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AgendaView"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "booking-controller" ]
+      },
+      "post" : {
+        "operationId" : "create",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "tenantId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/BookingRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/BookingView"
+                }
+              }
+            },
+            "description" : "Created"
+          }
+        },
+        "tags" : [ "booking-controller" ]
+      }
+    },
+    "/api/tenants/{tenantId}/bookings/{id}" : {
+      "patch" : {
+        "operationId" : "changeStatus",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "tenantId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/StatusRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/BookingView"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "booking-controller" ]
       }
     },
     "/api/tenants/{tenantId}/professionals" : {

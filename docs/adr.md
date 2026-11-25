@@ -85,3 +85,29 @@ front pode estar em outro fuso; zonas com horário de verão têm dias de 23 e 2
   implementa.
 **Consequência:** a conversão local ↔ UTC fica num lugar só (`ScheduleService`), coberta por testes de virada do dia
 UTC × local e de horário de verão; a 1c herda o formato sem decidir de novo.
+
+## ADR-009 — Ciclo de vida do agendamento e identidade do cliente
+
+**Contexto:** a restrição de exclusão (ADR-002) depende de quais status "ocupam" o horário, e mudar o predicado
+depois exige recriar o índice GiST com trava na tabela. A fase 2 traz a reserva pela página pública (PENDING) e a
+confirmação por código; o cliente precisa de uma identidade estável por estabelecimento.
+**Decisão:**
+- Status: `CONFIRMED` → `COMPLETED` (atendido) | `NO_SHOW` (falta) | `CANCELLED`, todos finais. Atendido e falta só
+  depois do início; cancelar a qualquer momento. A transição é um `UPDATE ... WHERE status = 'CONFIRMED'`: com dois
+  pedidos simultâneos, um vale e o outro recebe 409.
+- Ocupam o horário: `PENDING`, `CONFIRMED`, `COMPLETED`, `NO_SHOW` (atendido e falta mantêm o histórico do horário).
+  O predicado da restrição já inclui o `PENDING` da fase 2; um status final novo que libere o horário (ex.: `EXPIRED`
+  para reserva não confirmada) entra só no CHECK, sem recriar a restrição. No código, `BookingStatus.OCCUPYING` é a
+  mesma lista e é usada em "o que ocupa".
+- Fase 2: o `PENDING` fica no banco desde a reserva (a reserva no Redis é só a experiência do formulário); expirada a
+  reserva, um job com trava passa para `EXPIRED`.
+- Cliente: um por telefone (só dígitos) no estabelecimento. No painel, telefone já cadastrado com outro nome é 409 sem
+  revelar o nome guardado. Na página pública (fase 2) esse 409 seria enumeração de clientes: lá a identidade vem da
+  verificação por código, e o fluxo nunca responde diferente para telefone conhecido ou não.
+- Horário local que não existe ou se repete no dia (horário de verão) é recusado ao agendar (400), nunca ajustado em
+  silêncio.
+- A duração máxima de um agendamento (serviço + preparo, 600 min) vem dos limites do catálogo e é CHECK no banco: as
+  consultas "o que ocupa" contam com ela.
+**Consequência:** a fase 2 acrescenta status sem mexer na restrição; a regra de agendar (oferta, grade, horizonte,
+expediente, cliente) hoje mora em `BookingService.create`, atrás do guard de membro — na fase 2 ela vira um caso de
+uso sem guard próprio (`Propagation.MANDATORY`), chamado pelo painel e pela página pública, cada um com o seu guard.

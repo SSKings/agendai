@@ -13,7 +13,10 @@ describe('mensagens', () => {
   it('mensagens da agenda têm tradução própria (chave errada cairia no texto genérico)', () => {
     for (const m of ['End must be after start', 'Overlapping working hours', 'Times must be multiples of 5 minutes',
       'Time off not found', 'Time off already ended', 'Time off longer than 92 days', 'Time off limit reached',
-      'Date out of range', 'Professional does not perform this service']) {
+      'Date out of range', 'Professional does not perform this service', 'Booking not found', 'Service or professional inactive',
+      'Invalid phone', 'Start in the past', 'Outside working hours', 'Time slot not available', 'Invalid status change',
+      'Booking has not started', 'Booking limit reached', 'Phone registered with another name',
+      'Time does not exist or repeats on this day', 'Busy, try again']) {
       expect(translate(m), m).not.toBe(GENERIC_ERROR)
     }
   })

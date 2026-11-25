@@ -117,6 +117,18 @@ public abstract class IntegrationTest {
         }
     }
 
+    /** Consulta de um número como dono das tabelas (fora do RLS), para conferir o que a API deixou no banco. */
+    protected long ownerCount(String sql, Object... params) throws Exception {
+        try (var c = java.sql.DriverManager.getConnection(postgres.getJdbcUrl(), "agendai_owner", "owner-test");
+             var st = c.prepareStatement(sql)) {
+            for (int i = 0; i < params.length; i++) st.setObject(i + 1, params[i]);
+            try (var rs = st.executeQuery()) {
+                rs.next();
+                return rs.getLong(1);
+            }
+        }
+    }
+
     protected Session register() throws Exception {
         return register("Ana Souza", email(), "Barbearia da Ana");
     }

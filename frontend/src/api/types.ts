@@ -22,3 +22,8 @@ export type WorkingHoursView = S['WorkingHoursView']
 export type TimeOffView = S['TimeOffView']
 export type TimeOffInput = S['TimeOffRequest']
 export type AvailabilityView = S['AvailabilityView']
+
+export type BookingView = S['BookingView']
+export type BookingInput = S['BookingRequest']
+export type AgendaView = S['AgendaView']
+export type BookingStatus = BookingView['status']

@@ -36,12 +36,12 @@
 | `tenant` | Estabelecimento, equipe (participações), papéis (`OWNER` dono, `PROFESSIONAL` profissional); guard `TenantAccess` |
 | `catalog` | Serviços (duração, intervalo, preço em centavos) e profissionais com os serviços que cada um faz; até 100 serviços e 50 profissionais por estabelecimento (listas sempre limitadas); convites para a equipe (vínculo profissional ↔ conta) e `CatalogService.actor` (quem age por qual profissional), usado pela agenda e pelos agendamentos |
 | `schedule` | Expediente semanal por profissional (até 28 faixas), bloqueios e feriados (até 200 futuros por estabelecimento), cálculo de horários livres; usa o catálogo e o estabelecimento só pela API pública deles (`CatalogService.requireProfessional`/`offer`, `TenantService.zoneOf`) |
-| `booking` | Agendamentos (criar, cancelar, atendido, falta; pela página: pendente → confirmado por código; pelo link pessoal: consultar, cancelar e remarcar até 3 vezes) e clientes (ADR-009); usa `catalog` (`offer`), `schedule` (`calendar`; implementa a porta `BusyPeriods`) e `tenant` (`TenantAccess`, `zoneOf`) — nenhum deles depende de `booking` (ArchUnit); os métodos da página e do link (`createPending`, `confirm`, `abandon`, `lookup`, `cancelByClient`, `rescheduleByClient`) só são chamados por `publicbooking` |
-| `publicbooking` | Rotas públicas do cliente (sem login) em `/api/public/{link}`: leitura (2a), agendar (2b: reserva de 5 min no Redis — `Holds` —, pendente com código por e-mail, confirmação) e link pessoal (2c: consultar, cancelar, remarcar). Entra pelo guard `tenant.PublicAccess` (ADR-011); aplica a política do estabelecimento (`TenantService.policyOf`) por cima das regras do painel |
+| `booking` | Agendamentos (criar, cancelar, atendido, falta; pela página: pendente → confirmado por código; pelo link pessoal: consultar, cancelar e remarcar até 3 vezes) e clientes (ADR-009); usa `catalog` (`offer`), `schedule` (`calendar`; implementa a porta `BusyPeriods`) e `tenant` (`TenantAccess`, `zoneOf`) — nenhum deles depende de `booking` (ArchUnit); os métodos da página e do link (`createPending`, `confirm`, `abandon`, `lookup`, `cancelByClient`, `rescheduleByClient`) só são chamados por `publicbooking`; LGPD (2d): exportar e anonimizar um cliente (só o dono, `CustomerPrivacy`) e a retenção (`CustomerRetention`, função `anonymize_stale_customers`, V9) |
+| `publicbooking` | Rotas públicas do cliente (sem login) em `/api/public/{link}`: leitura (2a), agendar (2b: reserva de 5 min no Redis — `Holds` —, pendente com código por e-mail, confirmação) e link pessoal (2c: consultar, cancelar, remarcar). Entra pelo guard `tenant.PublicAccess` (ADR-011); aplica a política do estabelecimento (`TenantService.policyOf`) por cima das regras do painel. Horários livres da página em cache no Redis (`SlotCache`, ADR-012); a reserva lê o banco |
 | `waitlist` | Lista de espera e oferta de vaga |
 | `notification` | Envio de e-mail (`Mailer`; SMTP do provedor, Mailpit em dev/teste/CI), sempre fora da transação do banco: o código de confirmação (falhou → o pendente expira e 503) e os avisos ao cliente (melhor esforço, depois do commit). Na fase 3 vira outbox + worker (ADR-003 e emendas) |
 | `auth`, `security` | Login da equipe, tokens, limites, cabeçalhos |
-| `db`, `config`, `common` | Infraestrutura: variáveis do RLS na transação, configuração e validação de produção, erros padronizados |
+| `db`, `config`, `common` | Infraestrutura: variáveis do RLS na transação, configuração e validação de produção, erros padronizados. `DbSession.enterTenant` avisa (`TenantDataChanged`) depois do commit de toda escrita num estabelecimento |
 | `reporting` | Indicadores do painel |
 
 Métodos que um módulo oferece a outro (ex.: `CatalogService.offer`) usam `Propagation.MANDATORY` e não repetem o
@@ -121,16 +121,17 @@ certa — sem `@Scheduled` que rodaria em todas as instâncias ao mesmo tempo.
   até 92 dias), garantido com a trava de escrita por estabelecimento (`DbSession.lockTenant`).
 - Pool de conexões dimensionado e medido; índices definidos junto com cada consulta (e testados com `EXPLAIN` nos
   casos críticos).
-- Leitura mais frequente (horários livres da página pública) com cache curto no Redis, invalidado pelos eventos de
-  agendamento e de expediente (a partir da 2b; a 2a roda sem cache). Pendente para a fase 2: a troca de expediente, a criação/remoção de bloqueio, a criação
-  de agendamento e a mudança de status ainda não geram evento (entram pelo outbox junto com o cache; na mudança de
-  status, só quando o `UPDATE` condicional alterou a linha), e os horários livres e a criação de agendamento fazem
-  idas ao banco evitáveis (catálogo numa consulta só, cliente num comando só).
+- Leitura mais frequente (horários livres da página pública) com cache de 60 s no Redis desde a 2d, com uma versão por
+  estabelecimento que sobe depois de cada escrita gravada nele (ADR-012). Pendente: os horários livres e a criação de
+  agendamento fazem idas ao banco evitáveis (catálogo numa consulta só, cliente num comando só); medir no k6.
 - Espera por trava é curta: `lock_timeout` de 3 s em toda conexão (trava de escrita do estabelecimento, horário em
   disputa na restrição de exclusão, cliente sendo criado) → 503 "Busy, try again", sem segurar a conexão; pool do
   Hikari com 20 conexões e 5 s de espera (medir com o teste de carga).
 - Agendamentos: agenda de até 7 dias com teto de 500 itens (`truncated`; ativos antes dos cancelados) e até 1000
-  criados por estabelecimento em 24 h. Clientes ainda não têm listagem; crescem no ritmo dos agendamentos.
+  criados por estabelecimento em 24 h. Clientes ainda não têm listagem; crescem no ritmo dos agendamentos e a retenção
+  (LGPD) anonimiza a cada 6 h em lotes de 500, um atrás do outro (transações curtas) até a fila esvaziar ou 100 lotes.
+  Pendente: a passada relê os clientes antigos ainda ativos (anti-join); com volume, uma coluna de última atividade
+  indexada — medir com `EXPLAIN`. A exportação de um cliente tem teto de 1000 agendamentos (`truncated`).
 - Redis com timeout curto (200 ms): lento ou fora, o limite por IP é pulado (com aviso no log), nunca trava a API.
 
 ### Pendências registradas na revisão da fase 0 (para a fase 1)
@@ -138,8 +139,7 @@ certa — sem `@Scheduled` que rodaria em todas as instâncias ao mesmo tempo.
 - Login: o BCrypt roda dentro da transação com a linha do usuário travada; mover a verificação para fora e gravar as
   falhas num `UPDATE` atômico, e dimensionar o pool do Hikari com teste de carga.
 - `refresh_tokens`: job de limpeza dos vencidos (com trava distribuída) e índice parcial dos ativos.
-- Página pública (2a): roda sem cache (o cache dos horários livres no Redis e a invalidação por evento vêm com a 2b);
-  falta o cenário k6 dela (medir sem cache antes, para comparar); cerca de 10 idas ao banco por consulta de horários
+- Página pública (2a): falta o cenário k6 dela (o cache entrou na 2d, ADR-012; medir com e sem); cerca de 10 idas ao banco por consulta de horários
   (o fuso é lido duas vezes); o limite de 120/min por IP pode pegar clientes atrás de CGNAT da operadora — medir e
   ajustar (ADR-011).
 - Convite (1d): cadastro só de profissional (hoje o cadastro sempre cria um estabelecimento); `ProfessionalView.self`

@@ -63,7 +63,7 @@ Fase 2b (agendar pela página): e-mail fora do ar → 503 e nada fica (a transa�
 O e-mail do código não leva o nome digitado (é enviado pelo Agendaí a um endereço qualquer). Tetos por origem: os
 agendamentos da página têm teto diário próprio e de pendentes abertos (50 por estabelecimento) — um robô não trava o
 painel. Pendências: limite por e-mail de destino; o nome do estabelecimento (qualquer um cria um) aparece no e-mail —
-barrar URL nos nomes; clientes de tentativas nunca confirmadas ficam guardados (anonimizar na LGPD da 2c); EXECUTE da
+barrar URL nos nomes; clientes de tentativas nunca confirmadas ficam guardados (resolvido na 2d: a retenção os anonimiza em 30 dias); EXECUTE da
 função de expiração restrito ao papel da API (hoje vale o USAGE do schema, só dele).
 
 Fase 1d (convite), riscos aceitos e pendências: o 409 "telefone com outro nome" confirma a um profissional da equipe
@@ -80,9 +80,31 @@ Pendente: limpeza dos bloqueios antigos (job com trava, junto com a de `refresh_
 
 - **Mínimo necessário:** do cliente, só nome, e-mail e telefone; nada de CPF.
 - **Finalidade explícita** na página pública; consentimento separado para lembretes por WhatsApp.
-- **Direitos do titular:** o cliente pode pedir exportação e exclusão; exclusão anonimiza e mantém só o necessário
-  para a agenda do estabelecimento (horário, serviço).
-- **Retenção:** dados de clientes sem agendamento há 24 meses são anonimizados por um job.
+- **Direitos do titular (2d):** o estabelecimento é o controlador; o cliente pede a ele, e só o **dono** responde, pela
+  agenda: exportar (`GET /customers/{id}/export`, JSON com o cadastro e os agendamentos, inclusive o contato que a
+  página registrou) e apagar (`DELETE /customers/{id}`). Apagar anonimiza: nome vira "Cliente removido", telefone e
+  e-mail somem do cadastro; nos agendamentos somem o contato, a observação e o link pessoal; ficam horário, serviço,
+  profissional, status e preço (agenda e caixa). Com agendamento por acontecer (pendente ou confirmado), 409 (cancele
+  antes). O telefone liberado pode voltar num cadastro novo. Testes: `CustomerPrivacyIntegrationTest` (só o dono;
+  outro estabelecimento 404; o link pessoal para de valer).
+- **Titular certo:** a página liga o agendamento ao cadastro pelo telefone, e outra pessoa pode ter agendado com ele.
+  A agenda mostra quem agendou e, quando difere, o cadastro (`registeredName`) — é sobre ele que exportar e apagar
+  agem, e a confirmação nomeia o cadastro e o telefone. A exportação não entrega o contato de terceiro (nome e e-mail
+  diferentes do cadastro): fica só a marca `otherContact`.
+- **Apagar × agendar ao mesmo tempo:** apagar trava a linha do cadastro (`FOR UPDATE`) e quem agenda a lê com
+  `FOR SHARE`: ou o agendamento termina antes e conta para o 409, ou chega depois e cria um cadastro novo — nunca fica
+  ligado ao anonimizado (`bookWhileForgetting`).
+- **O que fica depois de anonimizar:** e-mails já enviados (no provedor e na caixa do cliente), backups do banco até
+  vencerem e logs de acesso com IP; nada disso sai pela API.
+- **Retenção (2d):** um job (a cada 6 h, lotes de 500, função `anonymize_stale_customers` — V9, `SECURITY DEFINER`,
+  `SKIP LOCKED`, relógio limitado ao `now()` do banco) anonimiza a tentativa pela página nunca confirmada depois de 30
+  dias e o cliente sem agendamento há 24 meses.
+- **Finalidade (2d):** o formulário da página diz para que os dados servem, por quanto tempo ficam e a quem pedir
+  cópia ou exclusão.
+- **Pendências (2d):** o dono só alcança um cliente pela agenda (até 366 dias para trás): o cliente com último
+  agendamento entre 1 ano e 24 meses ainda não tem caminho pela interface (busca por telefone, só para o dono); EXECUTE
+  de `anonymize_stale_customers` restrito ao papel da API (como o da V7: o nome do papel vem do ambiente; hoje vale o
+  USAGE do schema).
 - **Motivo de bloqueio** ("médico", "exame") pode ser dado de saúde da equipe: só o dono vê; o resto da equipe vê só
   o período (`ScheduleIntegrationTest.timeOffAccess`), e a página pública nunca o recebe.
 

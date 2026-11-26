@@ -137,4 +137,20 @@ class BookingConfirmUnitTest {
         assertThatThrownBy(() -> service(bookings, catalog).changeStatus(tenant, b.getId(),
                 new BookingDtos.StatusRequest(BookingStatus.CANCELLED))).isInstanceOf(ApiException.class).hasMessage(BookingService.INVALID_STATUS);
     }
+
+    @Test
+    @DisplayName("Cadastro apagado entre o INSERT (que não fez nada) e a leitura: cria de novo, com o telefone já livre")
+    void customerForgottenMidway() {
+        UUID tenant = UUID.randomUUID();
+        Customer fresh = mock(Customer.class);
+        CustomerRepository customers = mock(CustomerRepository.class);
+        when(customers.findByTenantIdAndPhone(tenant, "11987654321")).thenReturn(Optional.empty()).thenReturn(Optional.of(fresh));
+        BookingService s = new BookingService(mock(TenantAccess.class), mock(TenantService.class), catalog(), mock(ScheduleService.class),
+                mock(BookingRepository.class), customers, Clock.fixed(NOW, ZoneOffset.UTC));
+        org.assertj.core.api.Assertions.assertThat(s.findOrCreate(tenant,
+                new BookingDtos.CustomerInput("Bruno Lima", "11987654321", null), "11987654321", NOW)).isSameAs(fresh);
+        org.mockito.Mockito.verify(customers, org.mockito.Mockito.times(2))
+                .insertIfAbsent(any(), eq(tenant), eq("Bruno Lima"), eq("11987654321"), eq(null), eq(NOW));
+    }
 }
+

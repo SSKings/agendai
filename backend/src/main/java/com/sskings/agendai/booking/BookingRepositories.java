@@ -77,6 +77,20 @@ interface BookingRepository extends JpaRepository<Booking, UUID> {
 
     Optional<Booking> findByTenantIdAndAccessHash(UUID tenantId, String accessHash);
 
+    /** Os agendamentos de um cliente (exportação LGPD), do mais recente para trás, com teto. */
+    List<Booking> findByTenantIdAndCustomerIdOrderByStartsAtDesc(UUID tenantId, UUID customerId, Limit limit);
+
+    /** Ainda por acontecer e ocupando o horário: o cliente não pode ser apagado com isso marcado. */
+    boolean existsByTenantIdAndCustomerIdAndStatusInAndStartsAtAfter(UUID tenantId, UUID customerId,
+                                                                     Collection<BookingStatus> statuses, Instant after);
+
+    /** LGPD: os agendamentos do cliente anonimizado perdem o contato, a observação e o link pessoal. */
+    @Modifying(clearAutomatically = true)
+    @Query(value = """
+            UPDATE bookings SET contact_name = NULL, contact_email = NULL, access_hash = NULL, note = NULL, updated_at = :now
+            WHERE tenant_id = :tenant AND customer_id = :customer""", nativeQuery = true)
+    int forgetContact(@Param("tenant") UUID tenantId, @Param("customer") UUID customerId, @Param("now") Instant now);
+
     /** Na remarcação, o token passa para o agendamento novo (índice único): o antigo deixa de responder por ele. */
     @Modifying
     @Query(value = "UPDATE bookings SET access_hash = NULL WHERE tenant_id = :tenant AND id = :id", nativeQuery = true)
@@ -110,7 +124,30 @@ interface CustomerRepository extends JpaRepository<Customer, UUID> {
     int insertIfAbsent(@Param("id") UUID id, @Param("tenant") UUID tenantId, @Param("name") String name, @Param("phone") String phone,
                        @Param("email") String email, @Param("now") Instant now);
 
+    /**
+     * O cadastro pelo telefone, com FOR SHARE: um "apagar" (FOR UPDATE) em curso espera este agendamento terminar — e,
+     * se o apagar veio antes, a linha volta sem telefone (não acha: quem chama cria outro cadastro).
+     */
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_READ)
     Optional<Customer> findByTenantIdAndPhone(UUID tenantId, String phone);
 
     List<Customer> findByTenantIdAndIdIn(UUID tenantId, Collection<UUID> ids);
+
+    Optional<Customer> findByIdAndTenantId(UUID id, UUID tenantId);
+
+    /** Para apagar: espera quem está agendando com este cadastro (FOR SHARE) terminar, e barra os novos. */
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select c from Customer c where c.id = :id and c.tenantId = :tenant")
+    Optional<Customer> lockForForget(@Param("id") UUID id, @Param("tenant") UUID tenantId);
+
+    /** LGPD: o cadastro perde nome, telefone e e-mail; fica só o id (a agenda continua de pé). */
+    @Modifying(clearAutomatically = true)
+    @Query(value = """
+            UPDATE customers SET name = 'Cliente removido', phone = NULL, email = NULL, anonymized_at = :now
+            WHERE tenant_id = :tenant AND id = :id AND anonymized_at IS NULL""", nativeQuery = true)
+    int anonymize(@Param("tenant") UUID tenantId, @Param("id") UUID id, @Param("now") Instant now);
+
+    /** Função do banco (SECURITY DEFINER, V9): a retenção, em todos os estabelecimentos. */
+    @Query(value = "SELECT anonymize_stale_customers(:now, :max)", nativeQuery = true)
+    int anonymizeStale(@Param("now") Instant now, @Param("max") int max);
 }

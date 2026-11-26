@@ -92,7 +92,7 @@ public abstract class IntegrationTest {
     /** Dono recém-cadastrado: access token, refresh token, id e o estabelecimento criado no cadastro. */
     public record Session(String token, String refresh, String userId, String email, String tenantId) {}
 
-    @Autowired private org.testcontainers.postgresql.PostgreSQLContainer postgres;
+    @Autowired protected org.testcontainers.postgresql.PostgreSQLContainer postgres;
 
     /**
      * Põe alguém na equipe de um estabelecimento direto no banco, como dono das tabelas (que não passa pelo RLS). Só

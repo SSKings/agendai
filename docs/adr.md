@@ -178,3 +178,30 @@ o RLS esconde tudo — inclusive o estabelecimento dono do link.
   transação, passando o token. Avisos por e-mail saem depois do commit e não desfazem nada se falharem.
 **Consequência:** a página pública não tem caminho para dados de outro estabelecimento nem de clientes; os horários
 seguem as mesmas regras do painel, mais a política na página e no link pessoal.
+
+## ADR-012 — Cache dos horários livres: versão por estabelecimento, renovada a cada escrita gravada
+
+**Contexto:** os horários livres da página pública são a leitura mais frequente e a mais cara (catálogo, expediente,
+bloqueios e agendamentos do dia: ~10 idas ao banco). Meta: < 150 ms p95 com cache. Quase tudo que um estabelecimento
+grava mexe neles (agendamento, cancelamento, expediente, bloqueio, serviço, vínculo), e esquecer uma invalidação
+mostraria horário ocupado como livre.
+**Decisão:**
+- Chave no Redis com a **versão do estabelecimento**: `slots:{estabelecimento}:{versão}:{profissional}:{serviço}:{dia}`,
+  60 s de TTL. A versão (`slots:v:{estabelecimento}`, `INCR`, sem expirar: se voltasse a 1, entradas velhas da
+  versão 1 seriam servidas) sobe depois do commit de **toda transação que entrou no estabelecimento e escreveu** —
+  quem avisa é `DbSession.enterTenant` (por onde toda escrita passa para o RLS deixar ver as linhas), com o evento
+  `TenantDataChanged`. "Escreveu" é o PostgreSQL quem diz (`txid_current_if_assigned()` antes do commit): leitura,
+  transação desfeita e tentativa anônima que não grava nada (um `confirm` com token inventado, em laço) não renovam.
+  Nenhuma escrita precisa lembrar de invalidar.
+- O aviso é um evento em memória, entregue no máximo uma vez e fora do outbox (ADR-003): perdê-lo (Redis fora, queda
+  entre o commit e o `INCR`) só atrasa a renovação até o TTL. Erro no aviso nunca vira 500 depois do commit.
+- O cache guarda só as regras do painel (o pesado). A política (janela, antecedência) e o "a partir de agora" são
+  aplicados por cima em toda leitura; o TTL cobre o que muda sem escrita (pendente que venceu pelo relógio, ou pelo
+  job sem estabelecimento na transação).
+- Só a página pública usa o cache. A reserva (`POST /holds`) e o painel leem o banco; a restrição de exclusão
+  continua sendo a garantia final.
+- Redis fora do ar: calcula direto (leitura) e segue (aviso do commit) — o cache nunca derruba a página.
+**Consequência:** horário mostrado pode estar até 60 s velho só no que muda sem escrita; tudo o que é gravado aparece
+na leitura seguinte. Uma versão por estabelecimento renova também o que não mudou (escrita em um profissional renova
+os outros): simples e correto, ao custo de mais recálculos em estabelecimentos muito ativos — medir com o k6.
+

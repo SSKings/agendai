@@ -39,8 +39,14 @@ public class TenantAccess {
      */
     @Transactional(propagation = Propagation.MANDATORY)
     public void owner(UUID tenantId) {
-        if (member(tenantId).getRole() != Role.OWNER) throw ApiException.forbidden(OWNERS_ONLY);
+        ownerReading(tenantId);
         db.lockTenant(tenantId);
+    }
+
+    /** Só o dono, sem a trava de escrita: para leituras restritas ao dono (não enfileiram as escritas dos outros). */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void ownerReading(UUID tenantId) {
+        if (member(tenantId).getRole() != Role.OWNER) throw ApiException.forbidden(OWNERS_ONLY);
     }
 
     /**

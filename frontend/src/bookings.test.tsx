@@ -23,7 +23,7 @@ const logged = (routes: Record<string, unknown>, me: Me = ME) => ({ 'POST /api/a
 
 const booking = (over: Partial<BookingView>): BookingView => ({
   id: 'b1', professionalId: 'p1', serviceId: 's1',
-  customer: { id: 'c1', name: 'Carla Dias', phone: '11987654321' },
+  customer: { id: 'c1', name: 'Carla Dias', phone: '11987654321', registeredName: 'Carla Dias' },
   start: `${TODAY}T09:30:00-03:00`, end: `${TODAY}T10:00:00-03:00`,
   status: 'CONFIRMED', priceCents: 4500, outsideHours: false, ...over,
 })
@@ -124,9 +124,9 @@ describe('agenda', () => {
     bookings: [
       booking({ note: 'Primeira vez' }),
       booking({ id: 'b2', professionalId: 'p2', start: `${TODAY}T10:00:00-03:00`, end: `${TODAY}T10:30:00-03:00`, outsideHours: true }),
-      booking({ id: 'b3', status: 'CANCELLED', outsideHours: true, customer: { id: 'c2', name: 'Davi', phone: '11900000000' } }),
-      booking({ id: 'b4', status: 'COMPLETED', serviceId: 's9', professionalId: 'p9', customer: { id: 'c3', name: 'Eva', phone: '11911111111' } }),
-      booking({ id: 'b5', status: 'NO_SHOW', customer: { id: 'c4', name: 'Fábio', phone: '11922222222' } }),
+      booking({ id: 'b3', status: 'CANCELLED', outsideHours: true, customer: { id: 'c2', name: 'Davi', phone: '11900000000', registeredName: 'Davi' } }),
+      booking({ id: 'b4', status: 'COMPLETED', serviceId: 's9', professionalId: 'p9', customer: { id: 'c3', name: 'Eva', phone: '11911111111', registeredName: 'Eva' } }),
+      booking({ id: 'b5', status: 'NO_SHOW', customer: { id: 'c4', name: 'Fábio', phone: '11922222222', registeredName: 'Fábio' } }),
     ],
   }
 
@@ -142,7 +142,7 @@ describe('agenda', () => {
     expect(within(items[1]).getByText('fora do expediente')).toBeInTheDocument()
     expect(items[2]).toHaveTextContent('Cancelado')
     expect(items[2]).not.toHaveTextContent('fora do expediente')
-    expect(within(items[2]).queryByRole('button')).toBeNull()
+    expect(within(items[2]).queryByRole('button', { name: /^(Atendido|Faltou|Cancelar):/ })).toBeNull()
     expect(items[3]).toHaveTextContent('AtendidoServiço com profissional')
     expect(items[4]).toHaveTextContent('Faltou')
     expect(screen.queryByRole('heading', { name: formatDay(TODAY) })).toBeNull()
@@ -217,3 +217,86 @@ describe('agenda', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Algo deu errado.')
   })
 })
+
+describe('dados do cliente (LGPD)', () => {
+  const routes = (extra: Record<string, unknown> = {}) => logged({
+    [`GET ${T}/services`]: [CORTE], [`GET ${T}/professionals`]: [JOAO], ...extra,
+  })
+
+  it('dono exporta: baixa um JSON com o que a API devolveu', async () => {
+    const data = { exportedAt: '2026-11-30T15:00:00Z', business: 'Barbearia', customer: { id: 'c1' }, bookings: [], truncated: false }
+    mockApi(routes({ [`GET ${T}/bookings`]: { truncated: false, bookings: [booking({})] }, [`GET ${T}/customers/c1/export`]: data }))
+    const created: Blob[] = []
+    // jsdom não tem createObjectURL: define só para este teste e remove no fim
+    URL.createObjectURL = vi.fn((b: Blob) => (created.push(b), 'blob:x'))
+    const revokeObjectURL = (URL.revokeObjectURL = vi.fn())
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    renderApp('/e/t1/agenda')
+    await userEvent.click(await screen.findByRole('button', { name: 'Exportar dados: Carla Dias' }))
+    await waitFor(() => expect(click).toHaveBeenCalledOnce())
+    expect(JSON.parse(await created[0].text())).toEqual(data)
+    expect((click.mock.instances[0] as unknown as HTMLAnchorElement).download).toBe('dados-cliente-c1.json')
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:x')
+    click.mockRestore()
+    delete (URL as { createObjectURL?: unknown }).createObjectURL
+    delete (URL as { revokeObjectURL?: unknown }).revokeObjectURL
+  })
+
+  it('erro ao exportar aparece', async () => {
+    mockApi(routes({ [`GET ${T}/bookings`]: { truncated: false, bookings: [booking({})] }, [`GET ${T}/customers/c1/export`]: [500, undefined] }))
+    renderApp('/e/t1/agenda')
+    await userEvent.click(await screen.findByRole('button', { name: 'Exportar dados: Carla Dias' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Algo deu errado.')
+  })
+
+  it('apagar pede confirmação; confirmado, apaga e recarrega (anonimizado: sem telefone e sem as ações)', async () => {
+    let list: AgendaView = { truncated: false, bookings: [booking({ status: 'CANCELLED' })] }
+    const m = mockApi(routes({
+      [`GET ${T}/bookings`]: () => list,
+      [`DELETE ${T}/customers/c1`]: () => ((list = { truncated: false, bookings: [booking({ status: 'CANCELLED', customer: { id: 'c1', name: 'Cliente removido', registeredName: 'Cliente removido' } })] }), [204]),
+    }))
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
+    renderApp('/e/t1/agenda')
+    await userEvent.click(await screen.findByRole('button', { name: 'Apagar dados: Carla Dias' }))
+    expect(m.count('DELETE', `${T}/customers/c1`)).toBe(0)
+    await userEvent.click(screen.getByRole('button', { name: 'Apagar dados: Carla Dias' }))
+    expect(await screen.findByText(/Cliente removido/)).toBeInTheDocument()
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('Apagar os dados de Carla Dias (telefone 11987654321)?'))
+    expect(screen.getByRole('listitem')).toHaveTextContent('Corte com João')
+    expect(screen.getByRole('listitem')).not.toHaveTextContent('·  ·')
+    expect(screen.queryByRole('button', { name: /Exportar dados/ })).toBeNull()
+    confirm.mockRestore()
+  })
+
+  it('apagar com agendamento por acontecer: a mensagem explica', async () => {
+    mockApi(routes({
+      [`GET ${T}/bookings`]: { truncated: false, bookings: [booking({})] },
+      [`DELETE ${T}/customers/c1`]: [409, { status: 409, message: 'Customer has upcoming bookings' }],
+    }))
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    renderApp('/e/t1/agenda')
+    await userEvent.click(await screen.findByRole('button', { name: 'Apagar dados: Carla Dias' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('cancele antes de apagar os dados')
+    confirm.mockRestore()
+  })
+
+  it('agendado pela página com o telefone de outro cadastro: avisa, e as ações nomeiam o cadastro', async () => {
+    mockApi(routes({ [`GET ${T}/bookings`]: { truncated: false, bookings: [booking({ customer: { id: 'c1', name: 'Carla Dias', phone: '11987654321', registeredName: 'Bruno Lima' } })] } }))
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    renderApp('/e/t1/agenda')
+    expect(await screen.findByText('Agendado com o telefone do cadastro de Bruno Lima.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Exportar dados: Bruno Lima' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Apagar dados: Bruno Lima' }))
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('Apagar os dados de Bruno Lima (telefone 11987654321)?'))
+    confirm.mockRestore()
+  })
+
+  it('profissional da equipe não vê as ações de dados', async () => {
+    mockApi(logged({ [`GET ${T}/services`]: [CORTE], [`GET ${T}/professionals`]: [JOAO],
+      [`GET ${T}/bookings`]: { truncated: false, bookings: [booking({})] } }, AS_PROFESSIONAL))
+    renderApp('/e/t1/agenda')
+    expect(await screen.findByRole('button', { name: /^Atendido:/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Exportar dados|Apagar dados/ })).toBeNull()
+  })
+})
+

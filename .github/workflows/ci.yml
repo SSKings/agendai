@@ -59,10 +59,10 @@ jobs:
             # os agendamentos usam o catálogo e a agenda (offer, calendar): os testes deles também matam mutantes aqui
             tests: com.sskings.agendai.catalog.*Test,com.sskings.agendai.schedule.*Test,com.sskings.agendai.booking.*Test,com.sskings.agendai.publicbooking.*Test
           - area: agendamentos
-            classes: com.sskings.agendai.booking.*,com.sskings.agendai.notification.*
+            classes: com.sskings.agendai.booking.*,com.sskings.agendai.notification.*,com.sskings.agendai.db.DbSession*
             # a regra "profissional só na própria agenda" é testada junto com o convite (quem cria o vínculo); o pendente,
             # o código e o e-mail, pela reserva da página pública
-            tests: com.sskings.agendai.booking.*Test,com.sskings.agendai.catalog.InviteIntegrationTest,com.sskings.agendai.publicbooking.PublicReservationIntegrationTest,com.sskings.agendai.publicbooking.ManageLinkIntegrationTest
+            tests: com.sskings.agendai.booking.*Test,com.sskings.agendai.catalog.InviteIntegrationTest,com.sskings.agendai.publicbooking.PublicReservationIntegrationTest,com.sskings.agendai.publicbooking.ManageLinkIntegrationTest,com.sskings.agendai.db.DbSessionTest
     defaults:
       run:
         working-directory: backend

@@ -1,6 +1,7 @@
 import { useCallback, useId, useState } from 'react'
 import { bookings } from '../api/bookings'
 import { catalog } from '../api/catalog'
+import { customers } from '../api/customers'
 import type { BookingStatus, BookingView } from '../api/types'
 import { Alert, Button, Field } from '../components/fields'
 import { useLoad } from '../components/useLoad'
@@ -47,6 +48,34 @@ export function AgendaPage() {
     }
   }
 
+  /** Baixa o arquivo JSON com tudo o que o estabelecimento guarda do cliente (para entregar a ele). */
+  const exportData = async (b: BookingView) => {
+    try {
+      setActionError(null)
+      const data = await customers.exportData(tenant.id, b.customer.id)
+      const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }))
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `dados-cliente-${b.customer.id}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      setActionError(messageOf(err, 'Não foi possível exportar os dados.'))
+    }
+  }
+
+  const forget = async (b: BookingView) => {
+    // age sobre o CADASTRO do telefone, que pode não ser quem agendou pela página
+    if (!window.confirm(`Apagar os dados de ${b.customer.registeredName} (telefone ${b.customer.phone})? Nome, telefone, e-mail e observações somem de todos os agendamentos desse cadastro; os horários ficam na agenda. Não dá para desfazer.`)) return
+    try {
+      setActionError(null)
+      await customers.forget(tenant.id, b.customer.id)
+      await reload()
+    } catch (err) {
+      setActionError(messageOf(err, 'Não foi possível apagar os dados.'))
+    }
+  }
+
   return (
     <div className="space-y-4">
       <h2 className="text-lg font-semibold text-slate-900">Agenda</h2>
@@ -84,10 +113,20 @@ export function AgendaPage() {
                     )}
                   </p>
                   <p className="text-sm text-slate-500">
-                    {serviceName.get(b.serviceId) ?? 'Serviço'} com {professionalName.get(b.professionalId) ?? 'profissional'} · {b.customer.phone}
+                    {serviceName.get(b.serviceId) ?? 'Serviço'} com {professionalName.get(b.professionalId) ?? 'profissional'}{b.customer.phone ? ` · ${b.customer.phone}` : ''}
                     {b.note ? ` · ${b.note}` : ''}
                   </p>
+                  {b.customer.registeredName !== b.customer.name && (
+                    <p className="text-xs text-amber-700">Agendado com o telefone do cadastro de {b.customer.registeredName}.</p>
+                  )}
                 </div>
+                {/* LGPD: o dono responde aos pedidos do cliente; anonimizado (sem telefone) não tem mais o que exportar nem apagar */}
+                {tenant.role === 'OWNER' && b.customer.phone && (
+                  <div className="flex gap-2">
+                    <Button aria-label={`Exportar dados: ${b.customer.registeredName}`} onClick={() => void exportData(b)}>Exportar dados</Button>
+                    <Button aria-label={`Apagar dados: ${b.customer.registeredName}`} onClick={() => void forget(b)}>Apagar dados</Button>
+                  </div>
+                )}
                 {b.status === 'CONFIRMED' && (
                   <div className="flex gap-2">
                     <Button aria-label={`Atendido: ${b.customer.name} às ${timeOf(b.start)}`} onClick={() => void change(b, 'COMPLETED')}>Atendido</Button>

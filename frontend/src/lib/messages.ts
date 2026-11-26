@@ -23,6 +23,8 @@ const MESSAGES: Record<string, string> = {
   'Email unavailable, try again': 'Não conseguimos enviar o e-mail agora. Tente de novo em instantes.',
   'Too late to change': 'O prazo para cancelar ou remarcar por aqui acabou. Fale com o estabelecimento.',
   'Reschedule keeps the service': 'Para trocar de serviço, cancele e agende de novo.',
+  'Customer has upcoming bookings': 'Este cliente tem agendamento por acontecer: cancele antes de apagar os dados.',
+  'Customer not found': 'Cliente não encontrado.',
   'Reschedule limit reached': 'Este agendamento já foi remarcado o máximo de vezes. Fale com o estabelecimento.',
   'Too many pending bookings, try again later': 'Muitos agendamentos aguardando confirmação agora. Tente de novo em alguns minutos.',
   'Request body too large': 'Os dados enviados são grandes demais.',

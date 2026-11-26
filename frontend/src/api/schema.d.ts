@@ -164,6 +164,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/public/{slug}/bookings/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/public/{slug}/bookings/confirm": {
         parameters: {
             query?: never;
@@ -174,6 +190,38 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["confirm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/public/{slug}/bookings/lookup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["lookup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/public/{slug}/bookings/reschedule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["reschedule"];
         delete?: never;
         options?: never;
         head?: never;
@@ -237,6 +285,22 @@ export interface paths {
         };
         get: operations["get"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tenants/{id}/policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["policy"];
+        put: operations["updatePolicy"];
         post?: never;
         delete?: never;
         options?: never;
@@ -498,6 +562,10 @@ export interface components {
             status: "PENDING" | "CONFIRMED" | "COMPLETED" | "NO_SHOW" | "CANCELLED" | "EXPIRED";
         };
         BusinessView: {
+            /** Format: int32 */
+            bookingWindowDays: number;
+            /** Format: int32 */
+            cancelUntilHours: number;
             name: string;
             timeZone: string;
         };
@@ -553,6 +621,12 @@ export interface components {
             email: string;
             password: string;
         };
+        ManagedView: {
+            booking: components["schemas"]["PublicBookingView"];
+            /** Format: date-time */
+            changeUntil: string;
+            changeable: boolean;
+        };
         MeResponse: {
             email: string;
             /** Format: uuid */
@@ -564,6 +638,14 @@ export interface components {
             /** Format: date-time */
             expiresAt: string;
             token: string;
+        };
+        Policy: {
+            /** Format: int32 */
+            bookingWindowDays: number;
+            /** Format: int32 */
+            cancelUntilHours: number;
+            /** Format: int32 */
+            minNoticeMinutes: number;
         };
         ProfessionalRequest: {
             active: boolean;
@@ -582,7 +664,11 @@ export interface components {
         PublicBookingView: {
             /** Format: date-time */
             end: string;
+            /** Format: uuid */
+            professionalId: string;
             professionalName: string;
+            /** Format: uuid */
+            serviceId: string;
             serviceName: string;
             /** Format: date-time */
             start: string;
@@ -609,6 +695,10 @@ export interface components {
             email: string;
             name: string;
             password: string;
+        };
+        RescheduleRequest: {
+            holdToken: string;
+            token: string;
         };
         ServiceRequest: {
             active: boolean;
@@ -670,6 +760,9 @@ export interface components {
             reason?: string | null;
             /** Format: local-date-time */
             start: string;
+        };
+        TokenRequest: {
+            token: string;
         };
         UserView: {
             email: string;
@@ -930,6 +1023,32 @@ export interface operations {
             };
         };
     };
+    cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TokenRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PublicBookingView"];
+                };
+            };
+        };
+    };
     confirm: {
         parameters: {
             query?: never;
@@ -942,6 +1061,58 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PublicBookingView"];
+                };
+            };
+        };
+    };
+    lookup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TokenRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ManagedView"];
+                };
+            };
+        };
+    };
+    reschedule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RescheduleRequest"];
             };
         };
         responses: {
@@ -1045,6 +1216,54 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["TenantView"];
+                };
+            };
+        };
+    };
+    policy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["Policy"];
+                };
+            };
+        };
+    };
+    updatePolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Policy"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["Policy"];
                 };
             };
         };

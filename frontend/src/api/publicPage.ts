@@ -1,5 +1,5 @@
 import { api } from './client'
-import type { AvailabilityView, ClientInput, HoldView, PendingView, PublicBookingView, PublicBusiness, PublicProfessional, PublicService } from './types'
+import type { AvailabilityView, ClientInput, ManagedView, HoldView, PendingView, PublicBookingView, PublicBusiness, PublicProfessional, PublicService } from './types'
 
 // Página pública do estabelecimento (sem login): o link (slug) identifica o estabelecimento.
 const base = (slug: string) => `/api/public/${encodeURIComponent(slug)}`
@@ -15,4 +15,9 @@ export const publicPage = {
     api.post<HoldView>(`${base(slug)}/holds`, { serviceId, professionalId, start }),
   book: (slug: string, holdToken: string, customer: ClientInput) => api.post<PendingView>(`${base(slug)}/bookings`, { holdToken, customer }),
   confirm: (slug: string, token: string, code: string) => api.post<PublicBookingView>(`${base(slug)}/bookings/confirm`, { token, code }),
+  // link pessoal: o token sempre no corpo, nunca na URL
+  lookup: (slug: string, token: string) => api.post<ManagedView>(`${base(slug)}/bookings/lookup`, { token }),
+  cancel: (slug: string, token: string) => api.post<PublicBookingView>(`${base(slug)}/bookings/cancel`, { token }),
+  reschedule: (slug: string, token: string, holdToken: string) =>
+    api.post<PublicBookingView>(`${base(slug)}/bookings/reschedule`, { token, holdToken }),
 }

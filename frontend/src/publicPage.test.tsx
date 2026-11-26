@@ -12,7 +12,7 @@ beforeAll(() => {
 afterAll(() => vi.useRealTimers())
 
 const P = '/api/public/barbearia-da-ana'
-const BUSINESS = { name: 'Barbearia da Ana', timeZone: 'America/Sao_Paulo' }
+const BUSINESS = { name: 'Barbearia da Ana', timeZone: 'America/Sao_Paulo', bookingWindowDays: 60, cancelUntilHours: 24 }
 const CORTE = { id: 's1', name: 'Corte', durationMinutes: 30, priceCents: 4500 }
 const BARBA = { id: 's2', name: 'Barba', durationMinutes: 20, priceCents: 3000 }
 const free = (date: string, times: string[]) => ({ date, timeZone: 'America/Sao_Paulo', slots: times.map((t) => `${date}T${t}:00-03:00`) })
@@ -143,6 +143,8 @@ describe('página pública do estabelecimento (sem login)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Confirmar' }))
     expect(await screen.findByRole('heading', { name: 'Agendamento confirmado!' })).toBeInTheDocument()
     expect(screen.getByText('Corte com João, segunda, 30/11 às 09:00.')).toBeInTheDocument()
+    await userEvent.click(screen.getByLabelText('Seu link pessoal'))   // foco seleciona o link (para copiar)
+    expect(screen.getByLabelText('Seu link pessoal')).toHaveValue(`${window.location.origin}/agendar/barbearia-da-ana/gerenciar#${'t'.repeat(43)}`)
     expect(m.last('POST', `${P}/bookings/confirm`)!.body).toEqual({ token: 't'.repeat(43), code: '123456' })
   })
 
@@ -193,5 +195,13 @@ describe('página pública do estabelecimento (sem login)', () => {
     await pickSlot()
     expect(await screen.findByRole('status')).toHaveTextContent('Horário reservado')
     expect(m.count('POST', `${P}/holds`)).toBe(1)
+  })
+
+  it('a janela da política limita os dias oferecidos (hoje + N)', async () => {
+    mockApi(flow({ [`GET ${P}`]: { ...BUSINESS, bookingWindowDays: 2 } }))
+    renderApp('/agendar/barbearia-da-ana')
+    await userEvent.click(await screen.findByRole('button', { name: /Corte/ }))
+    await userEvent.click(await screen.findByRole('button', { name: 'João' }))
+    expect(screen.getAllByRole('button', { name: /^(segunda|terça|quarta|quinta|sexta|sábado|domingo), / })).toHaveLength(3)
   })
 })

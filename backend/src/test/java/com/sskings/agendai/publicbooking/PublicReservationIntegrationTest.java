@@ -133,7 +133,8 @@ class PublicReservationIntegrationTest extends IntegrationTest {
         assertThat(body(again)).as("clique duplo devolve o mesmo").isEqualTo(b);
         String[] fromAndSubject = mail.lastFromAndSubjectTo(email);
         assertThat(fromAndSubject[0]).isEqualTo("nao-responda@agendai.app");
-        assertThat(fromAndSubject[1]).startsWith("Seu código: " + code + " — Barbearia ");
+        assertThat(fromAndSubject[1]).as("o último é o aviso de confirmado").startsWith("Agendamento confirmado — Barbearia ");
+        assertThat(mail.countTo(email, "Seu código: " + code)).isEqualTo(1);
 
 
         JsonNode agenda = body(call(get(s.base() + "/bookings").param("from", MONDAY).param("to", MONDAY), s.owner().token(), null));

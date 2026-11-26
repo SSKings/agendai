@@ -87,7 +87,7 @@ class ArchitectureTest {
                         com.tngtech.archunit.core.domain.properties.HasOwner.Predicates.With.owner(
                                 com.tngtech.archunit.core.domain.JavaClass.Predicates.type(com.sskings.agendai.booking.BookingService.class)))
                         .and(com.tngtech.archunit.core.domain.JavaCall.Predicates.target(
-                                com.tngtech.archunit.core.domain.properties.HasName.Predicates.nameMatching("createPending|confirm|abandon"))))
+                                com.tngtech.archunit.core.domain.properties.HasName.Predicates.nameMatching("createPending|confirm|abandon|lookup|cancelByClient|rescheduleByClient"))))
                 .check(APP);
         noClasses().that().resideOutsideOfPackages("..publicbooking..", "..schedule..")
                 .should().callMethod(com.sskings.agendai.schedule.ScheduleService.class, "slots", java.util.UUID.class, java.util.UUID.class,

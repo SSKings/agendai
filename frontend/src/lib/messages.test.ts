@@ -19,7 +19,8 @@ describe('mensagens', () => {
       'Time does not exist or repeats on this day', 'Busy, try again', 'Only your own agenda', 'Professional already has an account',
       'Invalid or expired invite', 'Already a member of this business', 'Professional is inactive',
       'Professional has no linked account', 'Business not found', 'Too many holds', 'Hold expired', 'Invalid code',
-      'Booking expired', 'Too many attempts', 'Email unavailable, try again']) {
+      'Booking expired', 'Too many attempts', 'Email unavailable, try again', 'Too late to change', 'Reschedule keeps the service',
+      'Too many pending bookings, try again later', 'Reschedule limit reached']) {
       expect(translate(m), m).not.toBe(GENERIC_ERROR)
     }
   })

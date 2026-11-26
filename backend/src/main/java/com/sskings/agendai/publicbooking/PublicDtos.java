@@ -42,5 +42,11 @@ public final class PublicDtos {
     /** O código foi para o e-mail; o {@code token} confirma (e, na 2c, cancela ou remarca). */
     public record PendingView(String token, Instant expiresAt) {}
 
+    /** O token do link pessoal (vai no corpo, nunca na URL). */
+    public record TokenRequest(@NotBlank @Size(max = 64) String token) {}
+
+    /** Remarcar: o token do link pessoal e a reserva do horário novo (POST /holds antes). */
+    public record RescheduleRequest(@NotBlank @Size(max = 64) String token, @NotBlank @Size(max = 64) String holdToken) {}
+
     public record ConfirmRequest(@NotBlank @Size(max = 64) String token, @NotBlank @Pattern(regexp = "\\d{6}") String code) {}
 }

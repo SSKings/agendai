@@ -150,8 +150,8 @@ public class BookingService {
                                  String professionalName) {}
 
     /** Visão do cliente: o horário que é dele, sem nada do estabelecimento além do necessário. */
-    public record PublicBookingView(OffsetDateTime start, OffsetDateTime end, String serviceName, String professionalName,
-                                    BookingStatus status) {}
+    public record PublicBookingView(OffsetDateTime start, OffsetDateTime end, UUID serviceId, String serviceName, UUID professionalId,
+                                    String professionalName, BookingStatus status) {}
 
     /**
      * Agendamento pela página pública: nasce PENDING (segura o horário por 10 min) com um código de 6 dígitos e um token
@@ -181,10 +181,10 @@ public class BookingService {
      * pendente e libera o horário. Confirmar de novo (clique duplo) devolve o mesmo agendamento.
      */
     @Transactional(propagation = Propagation.MANDATORY, noRollbackFor = ApiException.class)   // a tentativa errada fica contada
-    public PublicBookingView confirm(UUID tenantId, String token, String code) {
+    public ClientBooking confirm(UUID tenantId, String token, String code) {
         Booking b = bookings.findByTenantIdAndAccessHash(tenantId, Tokens.sha256(token)).orElseThrow(() -> ApiException.notFound(NOT_FOUND));
         Instant now = clock.instant();
-        if (b.getStatus() == BookingStatus.CONFIRMED) return publicView(tenantId, b, BookingStatus.CONFIRMED);
+        if (b.getStatus() == BookingStatus.CONFIRMED) return new ClientBooking(publicView(tenantId, b, BookingStatus.CONFIRMED), null);
         if (b.getStatus() != BookingStatus.PENDING || !now.isBefore(b.getPendingUntil())) throw ApiException.badRequest(EXPIRED);
         if (bookings.countAttempt(tenantId, b.getId(), MAX_CODE_ATTEMPTS) == 0) {
             bookings.closePending(tenantId, b.getId(), BookingStatus.EXPIRED, now);
@@ -199,7 +199,73 @@ public class BookingService {
                 && bookings.statusOf(tenantId, b.getId()) != BookingStatus.CONFIRMED) {
             throw ApiException.badRequest(EXPIRED);   // venceu no meio; se o outro clique simultâneo confirmou, vale
         }
-        return publicView(tenantId, b, BookingStatus.CONFIRMED);
+        return new ClientBooking(publicView(tenantId, b, BookingStatus.CONFIRMED), b.getContactEmail());
+    }
+
+    // ---------- link pessoal do cliente (2c): o token de 256 bits que só ele tem ----------
+
+    static final String TOO_LATE = "Too late to change";
+    static final String SAME_SERVICE = "Reschedule keeps the service";
+    static final int MAX_RESCHEDULES = 3;
+    static final String RESCHEDULE_LIMIT = "Reschedule limit reached";
+
+    /** Visão do link pessoal: o agendamento e se ainda dá para cancelar/remarcar (até {@code changeUntil}). */
+    public record ManagedView(PublicBookingView booking, boolean changeable, Instant changeUntil) {}
+
+    /** Confirmado ou remarcado: a visão do cliente e o e-mail de contato (para o aviso, fora da transação). */
+    public record ClientBooking(PublicBookingView view, String email) {}
+
+    /** O link vale até o fim do atendimento; depois (ou token desconhecido), o mesmo 404. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public ManagedView lookup(UUID tenantId, String token, Duration cancelUntil) {
+        Booking b = byToken(tenantId, token);
+        Instant until = b.getStartsAt().minus(cancelUntil);
+        boolean changeable = b.getStatus() == BookingStatus.CONFIRMED && clock.instant().isBefore(until);
+        return new ManagedView(publicView(tenantId, b, b.getStatus()), changeable, until);
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public ClientBooking cancelByClient(UUID tenantId, String token, Duration cancelUntil) {
+        Booking b = changeable(tenantId, token, cancelUntil);
+        if (bookings.closeIfConfirmed(tenantId, b.getId(), BookingStatus.CANCELLED, clock.instant()) == 0) {
+            throw ApiException.conflict(INVALID_STATUS);
+        }
+        return new ClientBooking(publicView(tenantId, b, BookingStatus.CANCELLED), b.getContactEmail());
+    }
+
+    /**
+     * Remarca para um horário já reservado (a página reserva antes, com as mesmas regras): cancela o antigo e cria o
+     * novo na mesma transação — se o novo não couber, nada muda. O token passa para o novo.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public ClientBooking rescheduleByClient(UUID tenantId, String token, Duration cancelUntil, UUID professionalId, UUID serviceId,
+                                            LocalDateTime start) {
+        Booking old = changeable(tenantId, token, cancelUntil);
+        if (!old.getServiceId().equals(serviceId)) throw ApiException.badRequest(SAME_SERVICE);
+        // cada remarcação cria uma linha e um e-mail: sem limite, o link viraria gerador de linhas e gastaria os tetos
+        if (old.getReschedules() >= MAX_RESCHEDULES) throw ApiException.conflict(RESCHEDULE_LIMIT);
+        CatalogService.Offer offer = catalog.offer(tenantId, professionalId, serviceId);
+        ZoneId zone = tenants.zoneOf(tenantId);
+        Instant now = clock.instant();
+        if (bookings.closeIfConfirmed(tenantId, old.getId(), BookingStatus.CANCELLED, now) == 0) throw ApiException.conflict(INVALID_STATUS);
+        bookings.clearAccess(tenantId, old.getId());
+        Slot slot = slot(tenantId, professionalId, offer, start, zone, now, BookingSource.PUBLIC);
+        Booking b = insert(Booking.rescheduled(old, professionalId, slot.start(), slot.end(), slot.blockedUntil(), offer.priceCents(), now));
+        return new ClientBooking(publicView(tenantId, b, BookingStatus.CONFIRMED), b.getContactEmail());
+    }
+
+    private Booking byToken(UUID tenantId, String token) {
+        Booking b = bookings.findByTenantIdAndAccessHash(tenantId, Tokens.sha256(token)).orElseThrow(() -> ApiException.notFound(NOT_FOUND));
+        if (!clock.instant().isBefore(b.getEndsAt())) throw ApiException.notFound(NOT_FOUND);
+        return b;
+    }
+
+    /** Confirmado e ainda dentro do prazo da política (até {@code cancelUntil} antes do início). */
+    private Booking changeable(UUID tenantId, String token, Duration cancelUntil) {
+        Booking b = byToken(tenantId, token);
+        if (b.getStatus() != BookingStatus.CONFIRMED) throw ApiException.conflict(INVALID_STATUS);
+        if (!clock.instant().isBefore(b.getStartsAt().minus(cancelUntil))) throw ApiException.conflict(TOO_LATE);
+        return b;
     }
 
     /** O e-mail do código não saiu: o pendente não fica segurando o horário (a reserva já foi usada). */
@@ -212,7 +278,7 @@ public class BookingService {
         ZoneId zone = tenants.zoneOf(tenantId);
         CatalogService.Offer o = catalog.offer(tenantId, b.getProfessionalId(), b.getServiceId());
         return new PublicBookingView(b.getStartsAt().atZone(zone).toOffsetDateTime(), b.getEndsAt().atZone(zone).toOffsetDateTime(),
-                o.serviceName(), o.professionalName(), status);
+                b.getServiceId(), o.serviceName(), b.getProfessionalId(), o.professionalName(), status);
     }
 
     /** O código só vale para o seu agendamento: o hash leva o id junto. */

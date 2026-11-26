@@ -40,6 +40,12 @@ public class MailBox {
         return new String[]{m.get("From").get("Address").asString(), m.get("Subject").asString()};
     }
 
+    /** Quantos e-mails para {@code to} têm {@code subject} no assunto. */
+    public int countTo(String to, String subject) throws Exception {
+        JsonNode found = get("/api/v1/search?query=" + URLEncoder.encode("to:\"" + to + "\" subject:\"" + subject + "\"", StandardCharsets.UTF_8));
+        return found.get("messages") == null ? 0 : found.get("messages").size();
+    }
+
     public String lastCodeTo(String to) throws Exception {
         String text = lastTextTo(to);
         if (text == null) return null;

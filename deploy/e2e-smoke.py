@@ -83,6 +83,21 @@ def mailpit_code(base_url, to):
     return None
 
 
+def mailpit_text(base_url, to, contains):
+    """Texto do e-mail mais recente para `to` que contém `contains` (espera até 10 s)."""
+    import time
+    import urllib.parse
+    for _ in range(20):
+        q = urllib.parse.quote(f'to:"{to}" {contains}')
+        with urllib.request.urlopen(f"{base_url}/api/v1/search?query={q}", timeout=5) as r:
+            found = json.loads(r.read())
+        if found.get("messages"):
+            with urllib.request.urlopen(f"{base_url}/api/v1/message/{found['messages'][0]['ID']}", timeout=5) as r:
+                return json.loads(r.read())["Text"]
+        time.sleep(0.5)
+    return None
+
+
 def check(name, cond, detail=""):
     results.append(bool(cond))
     print(("OK    " if cond else "FALHA ") + name + (f"  [{detail}]" if detail and not cond else ""))
@@ -184,6 +199,15 @@ def main():
         s, ag, _ = call("GET", f"{base}/bookings?from={day}&to={day}", ana["accessToken"])
         check("o agendamento online aparece na agenda do dono", any(b["customer"]["name"] == "Cliente Online"
               and b["status"] == "CONFIRMED" for b in ag["bookings"]), ag)
+        # ---- link pessoal (fase 2c): o e-mail de confirmação traz o link; consultar e cancelar sem login ----
+        link_mail = mailpit_text(mailpit, to, "confirmado")
+        check("e-mail de confirmação com o link pessoal (token no fragmento)",
+              link_mail is not None and f"/agendar/{tenant['slug']}/gerenciar#{pend['token']}" in link_mail)
+        s, mine, _ = call("POST", pub + "/bookings/lookup", body={"token": pend["token"]})
+        check("link pessoal: consulta o próprio agendamento", s == 200 and mine["changeable"] is True, mine)
+        s, gone, _ = call("POST", pub + "/bookings/cancel", body={"token": pend["token"]})
+        check("link pessoal: cancela dentro do prazo", s == 200 and gone["status"] == "CANCELLED", gone)
+        check("token desconhecido: 404", call("POST", pub + "/bookings/lookup", body={"token": "x" * 43})[0] == 404)
 
     # ---- convite (fase 1d): o profissional entra com a própria conta e só vê a própria agenda ----
     s, inv, _ = call("POST", f"{base}/professionals/{pro['id']}/invite", ana["accessToken"])

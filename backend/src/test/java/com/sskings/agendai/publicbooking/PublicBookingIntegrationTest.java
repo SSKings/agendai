@@ -65,7 +65,9 @@ class PublicBookingIntegrationTest extends IntegrationTest {
         JsonNode business = body(anonymous(s.pub()));
         assertThat(business.get("name").asString()).isEqualTo("Barbearia Pública");
         assertThat(business.get("timeZone").asString()).isEqualTo("America/Sao_Paulo");
-        assertThat(business.size()).as("nada além disso (nem id, nem link)").isEqualTo(2);
+        assertThat(business.get("bookingWindowDays").asInt()).isEqualTo(60);
+        assertThat(business.get("cancelUntilHours").asInt()).isEqualTo(24);
+        assertThat(business.size()).as("nada além disso (nem id, nem link)").isEqualTo(4);
 
         JsonNode services = body(anonymous(s.pub() + "/services"));
         assertThat(services).hasSize(1);

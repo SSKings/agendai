@@ -28,6 +28,47 @@ public class TenantService {
 
     public record TenantView(UUID id, String name, String slug, String timeZone, Role role) {}
 
+    /** Política do estabelecimento para o cliente (a página pública e o link pessoal seguem; o painel, não). */
+    public record Policy(
+            @jakarta.validation.constraints.NotNull @jakarta.validation.constraints.Min(0) @jakarta.validation.constraints.Max(10080)
+            Integer minNoticeMinutes,
+            @jakarta.validation.constraints.NotNull @jakarta.validation.constraints.Min(0) @jakarta.validation.constraints.Max(720)
+            Integer cancelUntilHours,
+            @jakarta.validation.constraints.NotNull @jakarta.validation.constraints.Min(1) @jakarta.validation.constraints.Max(180)
+            Integer bookingWindowDays) {
+
+        public java.time.Duration minNotice() {
+            return java.time.Duration.ofMinutes(minNoticeMinutes);
+        }
+
+        public java.time.Duration cancelUntil() {
+            return java.time.Duration.ofHours(cancelUntilHours);
+        }
+    }
+
+    static final String FIVE_MINUTE_STEPS = "Times must be multiples of 5 minutes";
+
+    @Transactional(readOnly = true)
+    public Policy policy(UUID tenantId) {
+        access.member(tenantId);
+        return policyOf(tenantId);
+    }
+
+    @Transactional
+    public Policy updatePolicy(UUID tenantId, Policy p) {
+        access.owner(tenantId);
+        if (p.minNoticeMinutes() % 5 != 0) throw ApiException.badRequest(FIVE_MINUTE_STEPS);
+        tenants.findById(tenantId).orElseThrow().changePolicy(p.minNoticeMinutes(), p.cancelUntilHours(), p.bookingWindowDays());
+        return p;
+    }
+
+    /** Dentro de uma transação que já passou por um guard (painel ou página pública). */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Policy policyOf(UUID tenantId) {
+        Tenant t = tenants.findById(tenantId).orElseThrow();   // depois do guard, o estabelecimento existe e é visível
+        return new Policy(t.getMinNoticeMinutes(), t.getCancelUntilHours(), t.getBookingWindowDays());
+    }
+
     /** No cadastro: o dono cria o estabelecimento dele. Link único entre todos ("-2", "-3"... se o nome já existir). */
     @Transactional(propagation = Propagation.MANDATORY)
     public Tenant createFor(User owner, String name) {

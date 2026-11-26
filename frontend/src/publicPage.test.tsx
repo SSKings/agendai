@@ -132,6 +132,8 @@ describe('página pública do estabelecimento (sem login)', () => {
     expect(await screen.findByRole('heading', { name: 'Corte com João, segunda, 30/11 às 09:00' })).toBeInTheDocument()
     expect(await screen.findByRole('status')).toHaveTextContent('Horário reservado para você até 12:05.')
     expect(m.last('POST', `${P}/holds`)!.body).toEqual({ serviceId: 's1', professionalId: 'p1', start: '2026-11-30T09:00' })
+    // LGPD: a finalidade dos dados, antes de o cliente digitá-los
+    expect(screen.getByText(/Seus dados ficam com o estabelecimento/)).toBeInTheDocument()
     await userEvent.type(screen.getByLabelText('Seu nome'), ' Carla Dias ')
     await userEvent.type(screen.getByLabelText('Telefone'), '(11) 98765-4321')
     await userEvent.type(screen.getByLabelText('E-mail'), ' carla@exemplo.com ')

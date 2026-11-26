@@ -356,6 +356,38 @@ export interface paths {
         patch: operations["changeStatus"];
         trace?: never;
     };
+    "/api/tenants/{tenantId}/customers/{customerId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["forget"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tenants/{tenantId}/customers/{customerId}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["export"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/tenants/{tenantId}/professionals": {
         parameters: {
             query?: never;
@@ -583,6 +615,14 @@ export interface components {
             code: string;
             token: string;
         };
+        CustomerExport: {
+            bookings: components["schemas"]["ExportedBooking"][];
+            business: string;
+            customer: components["schemas"]["ExportedCustomer"];
+            /** Format: date-time */
+            exportedAt: string;
+            truncated: boolean;
+        };
         CustomerInput: {
             /** Format: email */
             email?: string;
@@ -594,7 +634,39 @@ export interface components {
             /** Format: uuid */
             id: string;
             name: string;
-            phone: string;
+            phone?: string | null;
+            registeredName: string;
+        };
+        ExportedBooking: {
+            contactEmail?: string | null;
+            contactName?: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            end: string;
+            note?: string | null;
+            otherContact: boolean;
+            /** Format: int32 */
+            priceCents: number;
+            professionalName: string;
+            serviceName: string;
+            /** @enum {string} */
+            source: "PANEL" | "PUBLIC";
+            /** Format: date-time */
+            start: string;
+            /** @enum {string} */
+            status: "PENDING" | "CONFIRMED" | "COMPLETED" | "NO_SHOW" | "CANCELLED" | "EXPIRED";
+        };
+        ExportedCustomer: {
+            /** Format: date-time */
+            anonymizedAt?: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            email?: string | null;
+            /** Format: uuid */
+            id: string;
+            name: string;
+            phone?: string | null;
         };
         HoldRequest: {
             /** Format: uuid */
@@ -1369,6 +1441,50 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["BookingView"];
+                };
+            };
+        };
+    };
+    forget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenantId: string;
+                customerId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    export: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenantId: string;
+                customerId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CustomerExport"];
                 };
             };
         };

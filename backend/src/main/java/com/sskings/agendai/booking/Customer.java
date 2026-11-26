@@ -27,7 +27,8 @@ class Customer {
     @Column(nullable = false, length = 100)
     private String name;
 
-    @Column(nullable = false, length = 15, updatable = false)
+    /** Nulo depois de anonimizado (LGPD, V9). */
+    @Column(length = 15, updatable = false)
     private String phone;
 
     @Column(length = 254)
@@ -35,4 +36,7 @@ class Customer {
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
+
+    @Column(name = "anonymized_at", updatable = false)
+    private Instant anonymizedAt;
 }

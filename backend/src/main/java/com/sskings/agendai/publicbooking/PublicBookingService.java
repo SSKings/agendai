@@ -48,6 +48,7 @@ public class PublicBookingService {
     private final org.springframework.transaction.support.TransactionTemplate tx;
     private final TenantService tenants;
     private final java.time.Clock clock;
+    private final SlotCache cache;
     @org.springframework.beans.factory.annotation.Value("${agendai.public-url}")
     private String publicUrl;
 
@@ -77,7 +78,8 @@ public class PublicBookingService {
     @Transactional(readOnly = true)
     public HoldView hold(String slug, HoldRequest r, String ip) {
         UUID tenantId = access.enter(slug).id();
-        AvailabilityView free = freeSlots(tenantId, r.professionalId(), r.serviceId(), r.start().toLocalDate());
+        // sem cache: a reserva olha o banco agora
+        AvailabilityView free = freeSlots(tenantId, r.professionalId(), r.serviceId(), r.start().toLocalDate(), false);
         boolean listed = free.slots().stream().anyMatch(s -> s.toLocalDateTime().equals(r.start()));
         if (!listed) throw ApiException.conflict(Holds.TAKEN);
         String token = holds.create(new Holds.Hold(tenantId, r.professionalId(), r.serviceId(), r.start()), ip);
@@ -222,14 +224,14 @@ public class PublicBookingService {
 
     @Transactional(readOnly = true)
     public AvailabilityView availability(String slug, UUID professionalId, UUID serviceId, LocalDate date) {
-        return freeSlots(access.enter(slug).id(), professionalId, serviceId, date);
+        return freeSlots(access.enter(slug).id(), professionalId, serviceId, date, true);
     }
 
     /**
      * Horários livres para o cliente: as regras do painel mais a política do estabelecimento — só até
      * {@code bookingWindowDays} à frente e a partir de agora + antecedência mínima.
      */
-    private AvailabilityView freeSlots(UUID tenantId, UUID professionalId, UUID serviceId, LocalDate date) {
+    private AvailabilityView freeSlots(UUID tenantId, UUID professionalId, UUID serviceId, LocalDate date, boolean cached) {
         // na página pública, tudo que não está "ativo e fazendo o serviço" é o mesmo 404: inativo ou sem vínculo não
         // se distingue de inexistente (o painel responde diferente, para o dono)
         if (catalog.activeProfessionalsFor(tenantId, serviceId).stream().noneMatch(p -> p.id().equals(professionalId))) {
@@ -238,7 +240,10 @@ public class PublicBookingService {
         TenantService.Policy policy = tenants.policyOf(tenantId);
         LocalDate today = LocalDate.now(clock.withZone(tenants.zoneOf(tenantId)));
         if (date.isAfter(today.plusDays(policy.bookingWindowDays()))) throw ApiException.badRequest("Date out of range");
-        AvailabilityView all = schedule.slots(tenantId, professionalId, serviceId, date);
+        // o cache guarda as regras do painel (o pesado); a política e o "a partir de agora" são aplicados por cima, sempre
+        AvailabilityView all = cached
+                ? cache.get(tenantId, professionalId, serviceId, date, () -> schedule.slots(tenantId, professionalId, serviceId, date))
+                : schedule.slots(tenantId, professionalId, serviceId, date);
         Instant earliest = clock.instant().plus(policy.minNotice());
         return new AvailabilityView(all.date(), all.timeZone(), all.slots().stream().filter(s -> !s.toInstant().isBefore(earliest)).toList());
     }

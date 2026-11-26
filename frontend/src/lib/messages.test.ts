@@ -20,7 +20,7 @@ describe('mensagens', () => {
       'Invalid or expired invite', 'Already a member of this business', 'Professional is inactive',
       'Professional has no linked account', 'Business not found', 'Too many holds', 'Hold expired', 'Invalid code',
       'Booking expired', 'Too many attempts', 'Email unavailable, try again', 'Too late to change', 'Reschedule keeps the service',
-      'Too many pending bookings, try again later', 'Reschedule limit reached']) {
+      'Too many pending bookings, try again later', 'Reschedule limit reached', 'Customer has upcoming bookings', 'Customer not found']) {
       expect(translate(m), m).not.toBe(GENERIC_ERROR)
     }
   })

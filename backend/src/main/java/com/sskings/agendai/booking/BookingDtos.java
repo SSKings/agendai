@@ -11,6 +11,7 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import java.time.LocalDateTime;
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -47,7 +48,25 @@ public final class BookingDtos {
 
     public record StatusRequest(@NotNull BookingStatus status) {}
 
-    public record CustomerView(UUID id, String name, String phone, @Schema(nullable = true) String email) {}
+    /** Telefone nulo: cliente anonimizado (LGPD). */
+    /**
+     * {@code name}/{@code email}: quem agendou (pela página, o contato digitado). {@code registeredName}: o cadastro a que
+     * o telefone liga — é sobre ele que agem a exportação e a exclusão (LGPD). Telefone nulo: anonimizado.
+     */
+    public record CustomerView(UUID id, String name, @Schema(nullable = true) String phone, @Schema(nullable = true) String email,
+                               String registeredName) {}
+
+    /** Exportação LGPD: o cadastro e os agendamentos (com o contato que a página registrou em cada um). */
+    public record CustomerExport(Instant exportedAt, String business, ExportedCustomer customer, List<ExportedBooking> bookings,
+                                 boolean truncated) {}
+
+    public record ExportedCustomer(UUID id, String name, @Schema(nullable = true) String phone, @Schema(nullable = true) String email,
+                                   Instant createdAt, @Schema(nullable = true) Instant anonymizedAt) {}
+
+    public record ExportedBooking(OffsetDateTime start, OffsetDateTime end, String serviceName, String professionalName,
+                                  BookingStatus status, BookingSource source, int priceCents,
+                                  @Schema(nullable = true) String contactName, @Schema(nullable = true) String contactEmail,
+                                  boolean otherContact, @Schema(nullable = true) String note, Instant createdAt) {}
 
     /**
      * {@code end}: fim do atendimento (o preparo depois não aparece). {@code outsideHours}: o expediente ou um bloqueio

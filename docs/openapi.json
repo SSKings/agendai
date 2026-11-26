@@ -227,6 +227,31 @@
         "required" : [ "code", "token" ],
         "type" : "object"
       },
+      "CustomerExport" : {
+        "properties" : {
+          "bookings" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ExportedBooking"
+            },
+            "type" : "array"
+          },
+          "business" : {
+            "type" : "string"
+          },
+          "customer" : {
+            "$ref" : "#/components/schemas/ExportedCustomer"
+          },
+          "exportedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "truncated" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "bookings", "business", "customer", "exportedAt", "truncated" ],
+        "type" : "object"
+      },
       "CustomerInput" : {
         "properties" : {
           "email" : {
@@ -264,10 +289,88 @@
             "type" : "string"
           },
           "phone" : {
+            "type" : [ "string", "null" ]
+          },
+          "registeredName" : {
             "type" : "string"
           }
         },
-        "required" : [ "id", "name", "phone" ],
+        "required" : [ "id", "name", "registeredName" ],
+        "type" : "object"
+      },
+      "ExportedBooking" : {
+        "properties" : {
+          "contactEmail" : {
+            "type" : [ "string", "null" ]
+          },
+          "contactName" : {
+            "type" : [ "string", "null" ]
+          },
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "end" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "note" : {
+            "type" : [ "string", "null" ]
+          },
+          "otherContact" : {
+            "type" : "boolean"
+          },
+          "priceCents" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "professionalName" : {
+            "type" : "string"
+          },
+          "serviceName" : {
+            "type" : "string"
+          },
+          "source" : {
+            "enum" : [ "PANEL", "PUBLIC" ],
+            "type" : "string"
+          },
+          "start" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "status" : {
+            "enum" : [ "PENDING", "CONFIRMED", "COMPLETED", "NO_SHOW", "CANCELLED", "EXPIRED" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "createdAt", "end", "otherContact", "priceCents", "professionalName", "serviceName", "source", "start", "status" ],
+        "type" : "object"
+      },
+      "ExportedCustomer" : {
+        "properties" : {
+          "anonymizedAt" : {
+            "format" : "date-time",
+            "type" : [ "string", "null" ]
+          },
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "email" : {
+            "type" : [ "string", "null" ]
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "phone" : {
+            "type" : [ "string", "null" ]
+          }
+        },
+        "required" : [ "createdAt", "id", "name" ],
         "type" : "object"
       },
       "HoldRequest" : {
@@ -1598,6 +1701,69 @@
           }
         },
         "tags" : [ "booking-controller" ]
+      }
+    },
+    "/api/tenants/{tenantId}/customers/{customerId}" : {
+      "delete" : {
+        "operationId" : "forget",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "tenantId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "customerId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "No Content"
+          }
+        },
+        "tags" : [ "customer-controller" ]
+      }
+    },
+    "/api/tenants/{tenantId}/customers/{customerId}/export" : {
+      "get" : {
+        "operationId" : "export",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "tenantId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "customerId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CustomerExport"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "customer-controller" ]
       }
     },
     "/api/tenants/{tenantId}/professionals" : {

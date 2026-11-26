@@ -189,6 +189,10 @@ function ClientForm({ slug, holdToken, until, onSent, onBack }: {
       <Field label="Telefone" type="tel" required maxLength={25} autoComplete="tel" hint="Com DDD." value={phone} onChange={(e) => setPhone(e.target.value)} />
       <Field label="E-mail" type="email" required maxLength={254} autoComplete="email" hint="Enviamos um código para confirmar."
         value={email} onChange={(e) => setEmail(e.target.value)} />
+      <p className="text-xs text-slate-500">
+        Seus dados ficam com o estabelecimento para este agendamento, os avisos sobre ele e os próximos que você marcar
+        (até 24 meses depois do último). Para receber uma cópia ou apagá-los, fale com o estabelecimento.
+      </p>
       {error && <Alert>{error}</Alert>}
       <div className="flex gap-2">
         <div className="w-48"><Submit busy={busy}>Receber o código</Submit></div>

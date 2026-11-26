@@ -58,7 +58,8 @@ local; expediente alterado não apaga agendamentos. **Desempenho:** agenda da se
 
 Em quatro PRs: **2a** página pública por link, só leitura (serviço → profissional → dia → horários livres), com limite
 por IP próprio; **2b** reserva temporária no Redis e confirmação por código no e-mail — PR #12; **2c** link pessoal para cancelar ou
-remarcar e política do estabelecimento; **2d** cache dos horários livres e LGPD.
+remarcar e política do estabelecimento — PR #13; **2d** cache dos horários livres (ADR-012) e LGPD (exportar e apagar os
+dados de um cliente, retenção, finalidade na página).
 
 - Página pública por slug, fluxo serviço → profissional → dia → horário.
 - Reserva temporária de 5 min no Redis; confirmação por código no e-mail.

@@ -165,8 +165,7 @@ public class BookingService {
         Instant now = clock.instant();
         Slot slot = slot(tenantId, professionalId, offer, local, zone, now, BookingSource.PUBLIC);
         String phone = digits(c.phone());
-        customers.insertIfAbsent(UUID.randomUUID(), tenantId, c.name(), phone, c.email(), now);
-        Customer customer = customers.findByTenantIdAndPhone(tenantId, phone).orElseThrow();
+        Customer customer = findOrCreate(tenantId, c, phone, now);
         String code = "%06d".formatted(RANDOM.nextInt(1_000_000));
         String token = Tokens.random();
         Instant until = now.plus(CODE_VALIDITY);
@@ -288,7 +287,7 @@ public class BookingService {
 
     private static BookingView withEmail(BookingView v, String email) {
         CustomerView c = v.customer();
-        return new BookingView(v.id(), v.professionalId(), v.serviceId(), new CustomerView(c.id(), c.name(), c.phone(), email),
+        return new BookingView(v.id(), v.professionalId(), v.serviceId(), new CustomerView(c.id(), c.name(), c.phone(), email, c.registeredName()),
                 v.start(), v.end(), v.status(), v.priceCents(), v.note(), v.outsideHours());
     }
 
@@ -310,10 +309,21 @@ public class BookingService {
      * agendamento ao cliente de outra pessoa nem serve de consulta "telefone → nome e e-mail".
      */
     private Customer customer(UUID tenantId, CustomerInput c, String phone, Instant now) {
-        customers.insertIfAbsent(UUID.randomUUID(), tenantId, c.name(), phone, c.email(), now);
-        Customer found = customers.findByTenantIdAndPhone(tenantId, phone).orElseThrow();
+        Customer found = findOrCreate(tenantId, c, phone, now);
         if (!found.getName().equalsIgnoreCase(c.name())) throw ApiException.conflict(PHONE_TAKEN);
         return found;
+    }
+
+    /**
+     * O cadastro do telefone, criado se não existe. Se um "apagar" acabou de anonimizar o cadastro entre o INSERT (que
+     * não fez nada) e a leitura, a leitura não acha: cria de novo, uma vez (o telefone agora está livre).
+     */
+    Customer findOrCreate(UUID tenantId, CustomerInput c, String phone, Instant now) {
+        customers.insertIfAbsent(UUID.randomUUID(), tenantId, c.name(), phone, c.email(), now);
+        java.util.Optional<Customer> found = customers.findByTenantIdAndPhone(tenantId, phone);
+        if (found.isPresent()) return found.get();
+        customers.insertIfAbsent(UUID.randomUUID(), tenantId, c.name(), phone, c.email(), now);
+        return customers.findByTenantIdAndPhone(tenantId, phone).orElseThrow();
     }
 
     /** Agenda de {@code from} a {@code to} (dias do fuso do estabelecimento, até 7), de todos ou de um profissional. */
@@ -372,9 +382,11 @@ public class BookingService {
 
     /** Pela página, o nome e o e-mail mostrados são os de quem confirmou o código (o telefone liga ao cadastro). */
     private static BookingView view(Booking b, Customer c, ZoneId zone, boolean outsideHours) {
-        boolean online = b.getSource() == BookingSource.PUBLIC;
+        // pela página e com o contato ainda lá (anonimizado: vale o cadastro, "Cliente removido")
+        boolean online = b.getSource() == BookingSource.PUBLIC && b.getContactName() != null;
         return new BookingView(b.getId(), b.getProfessionalId(), b.getServiceId(),
-                new CustomerView(c.getId(), online ? b.getContactName() : c.getName(), c.getPhone(), online ? b.getContactEmail() : c.getEmail()),
+                new CustomerView(c.getId(), online ? b.getContactName() : c.getName(), c.getPhone(), online ? b.getContactEmail() : c.getEmail(),
+                        c.getName()),
                 b.getStartsAt().atZone(zone).toOffsetDateTime(), b.getEndsAt().atZone(zone).toOffsetDateTime(),
                 b.getStatus(), b.getPriceCents(), b.getNote(), outsideHours);
     }

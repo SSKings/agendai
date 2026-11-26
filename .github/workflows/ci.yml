@@ -59,9 +59,10 @@ jobs:
             # os agendamentos usam o catálogo e a agenda (offer, calendar): os testes deles também matam mutantes aqui
             tests: com.sskings.agendai.catalog.*Test,com.sskings.agendai.schedule.*Test,com.sskings.agendai.booking.*Test,com.sskings.agendai.publicbooking.*Test
           - area: agendamentos
-            classes: com.sskings.agendai.booking.*
-            # a regra "profissional só na própria agenda" é testada junto com o convite (quem cria o vínculo)
-            tests: com.sskings.agendai.booking.*Test,com.sskings.agendai.catalog.InviteIntegrationTest
+            classes: com.sskings.agendai.booking.*,com.sskings.agendai.notification.*
+            # a regra "profissional só na própria agenda" é testada junto com o convite (quem cria o vínculo); o pendente,
+            # o código e o e-mail, pela reserva da página pública
+            tests: com.sskings.agendai.booking.*Test,com.sskings.agendai.catalog.InviteIntegrationTest,com.sskings.agendai.publicbooking.PublicReservationIntegrationTest
     defaults:
       run:
         working-directory: backend
@@ -168,6 +169,10 @@ jobs:
           CORS_ALLOWED_ORIGINS=https://localhost:18443
           HTTP_PORT=18080
           HTTPS_PORT=18443
+          MAIL_HOST=mailpit
+          MAIL_PORT=1025
+          MAIL_AUTH=false
+          MAIL_STARTTLS_REQUIRED=false
           EOF
           chmod 600 deploy/.env.prod
           mkdir -p deploy/certs
@@ -203,7 +208,7 @@ jobs:
       # rodam de novo com o superusuário — o entrypoint só os roda com o volume vazio — antes de a API nova migrar.
       - name: Sobe a versão do PR (db-init de novo, migrações sobre os dados existentes)
         run: |
-          compose() { docker compose -p "$PROJECT" -f deploy/docker-compose.prod.yml --env-file deploy/.env.prod "$@"; }
+          compose() { docker compose -p "$PROJECT" -f deploy/docker-compose.prod.yml -f deploy/docker-compose.ci.yml --env-file deploy/.env.prod "$@"; }
           compose up -d --wait --wait-timeout 120 db
           compose exec -T db sh -c 'for f in /docker-entrypoint-initdb.d/*.sh; do bash "$f" || exit 1; done'
           compose up -d --build --wait --wait-timeout 300
@@ -211,7 +216,7 @@ jobs:
       - name: Teste ponta a ponta (nginx TLS → API → PostgreSQL e Redis)
         run: |
           bash ../wait-https.sh "$URL"
-          python3 deploy/e2e-smoke.py "$URL"
+          MAILPIT_URL=http://127.0.0.1:18025 python3 deploy/e2e-smoke.py "$URL"
 
       # Barra vulnerabilidade HIGH/CRITICAL que já tem correção. Exceções justificadas e com validade: .trivyignore.yaml
       # A lista vem do compose (com o digest: imagem fixada só por digest não tem tag). O PostgreSQL fica de fora: as
@@ -219,6 +224,7 @@ jobs:
       # na rede interna "data". O Dependabot atualiza o digest.
       - name: Scan das imagens (Trivy)
         run: |
+          # (só a pilha de produção: o Mailpit do CI não vai para a produção)
           images=$(docker compose -p "$PROJECT" -f deploy/docker-compose.prod.yml --env-file deploy/.env.prod config --images | grep -v '^postgres')
           test -n "$images"
           for image in $images; do
@@ -231,8 +237,8 @@ jobs:
 
       - name: Logs (em caso de falha)
         if: failure()
-        run: docker compose -p "$PROJECT" -f deploy/docker-compose.prod.yml --env-file deploy/.env.prod logs --tail 200
+        run: docker compose -p "$PROJECT" -f deploy/docker-compose.prod.yml -f deploy/docker-compose.ci.yml --env-file deploy/.env.prod logs --tail 200
 
       - name: Derruba a pilha
         if: always()
-        run: docker compose -p "$PROJECT" -f deploy/docker-compose.prod.yml --env-file deploy/.env.prod down -v || true
+        run: docker compose -p "$PROJECT" -f deploy/docker-compose.prod.yml -f deploy/docker-compose.ci.yml --env-file deploy/.env.prod down -v || true

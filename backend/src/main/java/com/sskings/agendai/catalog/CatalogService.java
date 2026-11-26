@@ -166,7 +166,7 @@ public class CatalogService {
     // ---------- para outros módulos (agenda) ----------
 
     /** O que a agenda precisa de um serviço feito por um profissional; {@code bookable}: os dois estão ativos. */
-    public record Offer(int durationMinutes, int bufferMinutes, int priceCents, boolean bookable) {}
+    public record Offer(int durationMinutes, int bufferMinutes, int priceCents, boolean bookable, String serviceName, String professionalName) {}
 
     static final String NOT_PERFORMED = "Professional does not perform this service";
 
@@ -187,7 +187,7 @@ public class CatalogService {
         if (!links.existsByTenantIdAndId(tenantId, new ProfessionalService.Link(professionalId, serviceId))) {
             throw ApiException.badRequest(NOT_PERFORMED);
         }
-        return new Offer(s.getDurationMinutes(), s.getBufferMinutes(), s.getPriceCents(), p.isActive() && s.isActive());
+        return new Offer(s.getDurationMinutes(), s.getBufferMinutes(), s.getPriceCents(), p.isActive() && s.isActive(), s.getName(), p.getName());
     }
 
     /** Só o profissional vinculado mexe na própria agenda; o dono, em todas. */

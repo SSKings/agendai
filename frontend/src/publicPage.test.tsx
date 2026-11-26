@@ -105,4 +105,93 @@ describe('página pública do estabelecimento (sem login)', () => {
     await userEvent.click(await screen.findByRole('link', { name: 'Página pública: /agendar/barbearia-da-ana' }))
     expect(await screen.findByRole('heading', { name: 'Barbearia da Ana' })).toBeInTheDocument()
   })
+
+  const flow = (routes: Record<string, unknown>) => ({
+    'POST /api/auth/refresh': NO_SESSION,
+    [`GET ${P}`]: BUSINESS,
+    [`GET ${P}/services`]: [CORTE],
+    [`GET ${P}/services/s1/professionals`]: [{ id: 'p1', name: 'João' }],
+    [`GET ${P}/availability`]: free('2026-11-30', ['09:00']),
+    ...routes,
+  })
+  const pickSlot = async () => {
+    await userEvent.click(await screen.findByRole('button', { name: /Corte/ }))
+    await userEvent.click(await screen.findByRole('button', { name: 'João' }))
+    await userEvent.click(await screen.findByRole('button', { name: '09:00' }))
+  }
+
+  it('agenda: reserva o horário, pede os dados, envia o código e confirma', async () => {
+    const m = mockApi(flow({
+      [`POST ${P}/holds`]: [201, { token: 'h'.repeat(43), expiresAt: '2026-11-30T15:05:00Z' }],
+      [`POST ${P}/bookings`]: [201, { token: 't'.repeat(43), expiresAt: '2026-11-30T15:15:00Z' }],
+      [`POST ${P}/bookings/confirm`]: { start: '2026-11-30T09:00:00-03:00', end: '2026-11-30T09:30:00-03:00', serviceName: 'Corte',
+        professionalName: 'João', status: 'CONFIRMED' },
+    }))
+    renderApp('/agendar/barbearia-da-ana')
+    await pickSlot()
+    expect(await screen.findByRole('heading', { name: 'Corte com João, segunda, 30/11 às 09:00' })).toBeInTheDocument()
+    expect(await screen.findByRole('status')).toHaveTextContent('Horário reservado para você até 12:05.')
+    expect(m.last('POST', `${P}/holds`)!.body).toEqual({ serviceId: 's1', professionalId: 'p1', start: '2026-11-30T09:00' })
+    await userEvent.type(screen.getByLabelText('Seu nome'), ' Carla Dias ')
+    await userEvent.type(screen.getByLabelText('Telefone'), '(11) 98765-4321')
+    await userEvent.type(screen.getByLabelText('E-mail'), ' carla@exemplo.com ')
+    await userEvent.click(screen.getByRole('button', { name: 'Receber o código' }))
+    expect(await screen.findByLabelText('Código')).toBeInTheDocument()
+    expect(m.last('POST', `${P}/bookings`)!.body).toEqual({ holdToken: 'h'.repeat(43),
+      customer: { name: 'Carla Dias', phone: '(11) 98765-4321', email: 'carla@exemplo.com' } })
+    await userEvent.type(screen.getByLabelText('Código'), '123456')
+    await userEvent.click(screen.getByRole('button', { name: 'Confirmar' }))
+    expect(await screen.findByRole('heading', { name: 'Agendamento confirmado!' })).toBeInTheDocument()
+    expect(screen.getByText('Corte com João, segunda, 30/11 às 09:00.')).toBeInTheDocument()
+    expect(m.last('POST', `${P}/bookings/confirm`)!.body).toEqual({ token: 't'.repeat(43), code: '123456' })
+  })
+
+  it('horário que acabou de ser ocupado: aviso e volta à lista atualizada', async () => {
+    const m = mockApi(flow({ [`POST ${P}/holds`]: [409, { status: 409, message: 'Time slot not available' }] }))
+    renderApp('/agendar/barbearia-da-ana')
+    await pickSlot()
+    expect(await screen.findByRole('alert')).toHaveTextContent('Esse horário acabou de ser ocupado. Escolha outro.')
+    const before = m.count('GET', `${P}/availability`)
+    await userEvent.click(screen.getByRole('button', { name: 'Escolher outro horário' }))
+    await waitFor(() => expect(m.count('GET', `${P}/availability`)).toBe(before + 1))
+    expect(await screen.findByRole('list', { name: 'Horários livres' })).toBeInTheDocument()
+  })
+
+  it('erros de envio e de código aparecem traduzidos; dá para voltar em cada etapa', async () => {
+    let sent = false
+    mockApi(flow({
+      [`POST ${P}/holds`]: [201, { token: 'h'.repeat(43), expiresAt: '2026-11-30T15:05:00Z' }],
+      [`POST ${P}/bookings`]: () => (sent ? [201, { token: 't'.repeat(43), expiresAt: '2026-11-30T15:15:00Z' }]
+        : ((sent = true), [503, { status: 503, message: 'Email unavailable, try again' }])),
+      [`POST ${P}/bookings/confirm`]: [400, { status: 400, message: 'Invalid code' }],
+    }))
+    renderApp('/agendar/barbearia-da-ana')
+    await pickSlot()
+    await userEvent.type(await screen.findByLabelText('Seu nome'), 'Carla')
+    await userEvent.type(screen.getByLabelText('Telefone'), '11987654321')
+    await userEvent.type(screen.getByLabelText('E-mail'), 'carla@exemplo.com')
+    await userEvent.click(screen.getByRole('button', { name: 'Receber o código' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Não conseguimos enviar o e-mail agora.')
+    await userEvent.click(screen.getByRole('button', { name: 'Receber o código' }))
+    await userEvent.type(await screen.findByLabelText('Código'), '000000')
+    await userEvent.click(screen.getByRole('button', { name: 'Confirmar' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Código incorreto.')
+    await userEvent.click(screen.getByRole('button', { name: 'Escolher outro horário' }))
+    expect(await screen.findByRole('list', { name: 'Horários livres' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '09:00' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Voltar' }))
+    expect(await screen.findByRole('list', { name: 'Horários livres' })).toBeInTheDocument()
+  })
+
+  it('com StrictMode (efeito rodando duas vezes), a reserva é pedida uma vez só', async () => {
+    const m = mockApi(flow({ [`POST ${P}/holds`]: [201, { token: 'h'.repeat(43), expiresAt: '2026-11-30T15:05:00Z' }] }))
+    const { StrictMode } = await import('react')
+    const { render } = await import('@testing-library/react')
+    const { MemoryRouter } = await import('react-router-dom')
+    const { App } = await import('./App')
+    render(<StrictMode><MemoryRouter initialEntries={['/agendar/barbearia-da-ana']}><App /></MemoryRouter></StrictMode>)
+    await pickSlot()
+    expect(await screen.findByRole('status')).toHaveTextContent('Horário reservado')
+    expect(m.count('POST', `${P}/holds`)).toBe(1)
+  })
 })

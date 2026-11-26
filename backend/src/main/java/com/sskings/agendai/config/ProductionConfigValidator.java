@@ -25,10 +25,14 @@ public class ProductionConfigValidator {
     public ProductionConfigValidator(AgendaiProperties props, @Value("${spring.datasource.url:}") String databaseUrl,
                                      @Value("${spring.datasource.username:}") String appUser,
                                      @Value("${spring.flyway.user:}") String migrationUser,
-                                     @Value("${spring.data.redis.password:}") String redisPassword) {
+                                     @Value("${spring.data.redis.password:}") String redisPassword,
+                                     @Value("${spring.mail.host:}") String mailHost) {
         List<String> problems = new ArrayList<>(problems(props.jwt().secret(), props.cors().allowedOrigins(), databaseUrl));
         problems.addAll(databaseUserProblems(appUser, migrationUser));
         problems.addAll(sessionProblems(redisPassword, props.refresh().secureCookie()));
+        if (mailHost == null || mailHost.isBlank()) {
+            problems.add("MAIL_HOST: informe o SMTP do provedor (o código de confirmação do agendamento vai por e-mail)");
+        }
         if (!problems.isEmpty()) {
             throw new IllegalStateException("Configuração de produção insegura:\n - " + String.join("\n - ", problems));
         }

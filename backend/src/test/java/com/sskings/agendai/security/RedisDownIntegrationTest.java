@@ -38,4 +38,35 @@ class RedisDownIntegrationTest extends IntegrationTest {
             docker.unpauseContainerCmd(redis.getContainerId()).exec();
         }
     }
+
+    @Test
+    @DisplayName("Redis parado: a página pública não reserva (503 'tente de novo'), mas o painel continua agendando")
+    void holdsNeedRedis() throws Exception {
+        Session ana = register("Ana", email(), "Loja Sem Redis " + java.util.UUID.randomUUID().toString().substring(0, 6));
+        String slug = body(call(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/me"), ana.token(), null))
+                .get("tenants").get(0).get("slug").asString();
+        String base = "/api/tenants/" + ana.tenantId();
+        String corte = body(call(post(base + "/services"), ana.token(), Map.of("name", "Corte", "durationMinutes", 30,
+                "bufferMinutes", 0, "priceCents", 0, "active", true))).get("id").asString();
+        String joao = body(call(post(base + "/professionals"), ana.token(), Map.of("name", "João", "active", true,
+                "serviceIds", java.util.List.of(corte)))).get("id").asString();
+        call(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(base + "/professionals/" + joao + "/working-hours"),
+                ana.token(), Map.of("intervals", java.util.List.of(Map.of("weekday", 1, "start", "09:00", "end", "12:00"))));
+        var docker = DockerClientFactory.instance().client();
+        docker.pauseContainerCmd(redis.getContainerId()).exec();
+        try {
+            var held = call(post("/api/public/" + slug + "/holds"), null, Map.of("serviceId", corte, "professionalId", joao,
+                    "start", "2026-11-30T09:00"));
+            assertThat(held.getStatus()).as(held.getContentAsString()).isEqualTo(503);
+            assertThat(body(held).get("message").asString()).isEqualTo("Busy, try again");
+            var taken = call(post("/api/public/" + slug + "/bookings"), null, Map.of("holdToken", "x".repeat(43),
+                    "customer", Map.of("name", "Carla", "phone", "11987654321", "email", "c@x.com")));
+            assertThat(taken.getStatus()).isEqualTo(503);
+            assertThat(call(post(base + "/bookings"), ana.token(), Map.of("professionalId", joao, "serviceId", corte,
+                    "start", "2026-11-30T09:00", "customer", Map.of("name", "Carla", "phone", "11987654321"))).getStatus())
+                    .as("o painel não depende do Redis").isEqualTo(201);
+        } finally {
+            docker.unpauseContainerCmd(redis.getContainerId()).exec();
+        }
+    }
 }

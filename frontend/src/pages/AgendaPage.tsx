@@ -10,6 +10,8 @@ import { ProfessionalPicker } from './ProfessionalPicker'
 import { useTenant } from './TenantLayout'
 
 const STATUS: Record<BookingStatus, string> = {
+  PENDING: 'Aguardando o código do cliente',
+  EXPIRED: 'Expirado',
   CONFIRMED: 'Confirmado',
   COMPLETED: 'Atendido',
   NO_SHOW: 'Faltou',

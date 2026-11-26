@@ -69,8 +69,10 @@ public class SecurityConfig {
                 .authorizeHttpRequests(a -> {
                     a.requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login", "/api/auth/refresh").permitAll()
                      .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
-                     // página pública do estabelecimento (só leitura nesta etapa): guard próprio por link (PublicAccess)
+                     // página pública do estabelecimento: guard próprio por link (PublicAccess, ADR-011)
                      .requestMatchers(HttpMethod.GET, "/api/public/**").permitAll()
+                     // reserva, agendamento pendente e confirmação por código (2b): mesmo guard por link
+                     .requestMatchers(HttpMethod.POST, "/api/public/*/holds", "/api/public/*/bookings", "/api/public/*/bookings/confirm").permitAll()
                      .requestMatchers("/error").permitAll();
                     if (docs) a.requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll();
                     a.anyRequest().authenticated();

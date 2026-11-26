@@ -31,7 +31,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-@Import(TestcontainersConfiguration.class)
+@Import({TestcontainersConfiguration.class, com.sskings.agendai.booking.BookingTestSupport.class})
 public abstract class IntegrationTest {
 
     public static final String PASSWORD = "Vagalume4821";

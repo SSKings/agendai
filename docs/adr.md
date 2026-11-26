@@ -25,6 +25,12 @@ falha.
 é idempotente (`processed_events`) e usa novas tentativas com espera crescente e fila de falhas.
 **Consequência:** entrega "pelo menos uma vez" com efeito "exatamente uma vez" no worker; atraso de alguns segundos.
 
+**Emenda (fase 2b, temporária até a fase 3):** o código de confirmação do agendamento pela página sai por e-mail
+síncrono, na requisição, porque o outbox e o worker ainda não existem. Para não violar o espírito desta decisão: o
+pendente é gravado numa transação própria e o e-mail sai fora dela (provedor lento não segura conexão nem trava); se
+o envio falha, o pendente expira na hora e a resposta é 503 — nada fica valendo sem o código. Na fase 3 o envio passa
+para o outbox.
+
 ## ADR-004 — TDD e 100% de cobertura exigidos pelo CI
 
 **Contexto:** o objetivo do projeto é mostrar engenharia confiável; os projetos anteriores mostraram que cobertura
@@ -55,6 +61,8 @@ sozinha.
 **Contexto:** limite por IP e reservas temporárias em memória local quebram com mais de uma instância.
 **Decisão:** reservas (com expiração), limites por IP/estabelecimento e o cache de horários livres ficam no Redis.
 Se o Redis cair, a API continua agendando (a garantia é o banco), sem cache e com limite degradado registrado em alerta.
+Exceção (fase 2b): a página pública não reserva sem o Redis (503 "tente de novo") — a reserva de 5 min é parte do
+fluxo do cliente; o painel continua agendando normalmente.
 **Consequência:** mais um serviço na pilha; comportamento com o Redis fora é testado.
 
 ## ADR-008 — Tempo na agenda: expediente em hora local, bloqueios em UTC, horários livres com deslocamento
@@ -99,8 +107,11 @@ confirmação por código; o cliente precisa de uma identidade estável por esta
   O predicado da restrição já inclui o `PENDING` da fase 2; um status final novo que libere o horário (ex.: `EXPIRED`
   para reserva não confirmada) entra só no CHECK, sem recriar a restrição. No código, `BookingStatus.OCCUPYING` é a
   mesma lista e é usada em "o que ocupa".
-- Fase 2: o `PENDING` fica no banco desde a reserva (a reserva no Redis é só a experiência do formulário); expirada a
-  reserva, um job com trava passa para `EXPIRED`.
+- Fase 2b: a reserva de 5 min fica só no Redis; o `PENDING` nasce no banco quando o cliente manda os dados e pede o
+  código, e segura o horário por 10 min. Vencido, um job passa para `EXPIRED` (um UPDATE idempotente pela função
+  `expire_pending_bookings`, seguro com várias instâncias sem trava); antes disso, horários livres e novos agendamentos
+  já ignoram o pendente vencido. Pela página, o nome e o e-mail de quem confirmou ficam no agendamento e são o que a
+  agenda mostra (o cadastro por telefone pode ser de outra pessoa).
 - Cliente: um por telefone (só dígitos) no estabelecimento. No painel, telefone já cadastrado com outro nome é 409 sem
   revelar o nome guardado. Na página pública (fase 2) esse 409 seria enumeração de clientes: lá a identidade vem da
   verificação por código, e o fluxo nunca responde diferente para telefone conhecido ou não.
@@ -152,7 +163,10 @@ o RLS esconde tudo — inclusive o estabelecimento dono do link.
 - Limite por IP próprio (120/min) e, somando todas as origens, por estabelecimento (1200/min), no Redis; separado do
   limite da autenticação. A página do cliente no front fica fora do contexto de sessão da equipe (não tenta renovar
   sessão, não gasta o limite de login do IP compartilhado do salão).
-- Escrita anônima (2b: reserva, cliente, agendamento PENDING) só por esse mesmo guard, com teto por IP/estabelecimento
-  e confirmação por código — o RLS continua valendo sem usuário.
+- Escrita anônima (2b) só por esse mesmo guard: reserva no Redis (5 min, `SET NX`, até 3 por origem), cliente e
+  agendamento PENDING (segura o horário por 10 min), confirmado com o código de 6 dígitos enviado ao e-mail — o RLS
+  continua valendo sem usuário. Expirar os pendentes vencidos de todos os estabelecimentos é a função
+  `expire_pending_bookings` (V7, `SECURITY DEFINER`, um UPDATE idempotente), chamada por um job; os horários livres e a
+  criação de agendamento já ignoram o pendente vencido antes disso.
 **Consequência:** a página pública não tem caminho para dados de outro estabelecimento nem de clientes; a regra de
 horários é uma só para painel e página.

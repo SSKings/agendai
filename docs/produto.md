@@ -51,8 +51,10 @@ decisão do dono).
 
 - Página pública `agendai.app/{slug}`: serviço → profissional (ou "qualquer um") → dia → horário.
 - **Reserva temporária:** ao escolher o horário, ele fica segurado por 5 minutos enquanto o cliente preenche nome,
-  telefone e e-mail.
-- **Confirmação por código** de 6 dígitos no e-mail (impede agendamento falso em nome de outra pessoa e spam).
+  telefone e e-mail (no máximo 3 reservas abertas por origem).
+- **Confirmação por código** de 6 dígitos no e-mail (impede agendamento falso em nome de outra pessoa e spam): até lá o
+  agendamento fica "aguardando o código" na agenda do dono e segura o horário por 10 minutos; código errado 5 vezes
+  ou prazo vencido liberam o horário.
 - Link pessoal (de uso restrito, sem login) para **cancelar ou remarcar**, dentro da política.
 
 **Critérios de aceite:** nunca dois agendamentos sobrepostos para o mesmo profissional, nem sob concorrência; reserva

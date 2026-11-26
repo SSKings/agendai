@@ -11,6 +11,12 @@ spring:
   flyway:
     user: agendai_owner
     password: dev-owner-password
+  mail:
+    host: localhost
+    port: 1025                   # Mailpit do compose.yaml: e-mails em http://localhost:8025
+    properties:
+      mail.smtp.auth: false
+      mail.smtp.starttls.required: false
   data:
     redis:
       port: 6380

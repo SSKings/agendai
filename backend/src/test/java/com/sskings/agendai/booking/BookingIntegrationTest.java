@@ -158,7 +158,7 @@ class BookingIntegrationTest extends IntegrationTest {
     }
 
     @Test
-    @DisplayName("100 pedidos simultâneos para o mesmo horário → exatamente 1 agendamento; 99 recebem 409")
+    @DisplayName("100 pedidos simultâneos para o mesmo horário → exatamente 1 agendamento; os outros 99 recusados (409, ou 503 sob carga)")
     void hundredConcurrentRequests() throws Exception {
         Shop s = shop();
         CountDownLatch start = new CountDownLatch(1);
@@ -178,7 +178,11 @@ class BookingIntegrationTest extends IntegrationTest {
             List<String> statuses = new ArrayList<>();
             for (Future<String> r : results) statuses.add(r.get(60, TimeUnit.SECONDS));
             assertThat(statuses).filteredOn("201"::equals).hasSize(1);
-            assertThat(statuses).filteredOn(("409 " + BookingService.TAKEN)::equals).hasSize(99);
+            // perdedores: 409 (horário ocupado) ou, sob carga pesada, 503 "tente de novo" (esperou mais que o lock_timeout
+            // pelo vencedor) — nunca outra coisa, e nunca um segundo agendamento
+            assertThat(statuses).filteredOn(st -> !st.equals("201"))
+                    .allMatch(st -> st.equals("409 " + BookingService.TAKEN) || st.equals("503 Busy, try again"), "409 ou 503")
+                    .hasSize(99);
         } finally {
             pool.shutdownNow();
         }

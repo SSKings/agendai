@@ -18,7 +18,8 @@ describe('mensagens', () => {
       'Booking has not started', 'Booking limit reached', 'Phone registered with another name',
       'Time does not exist or repeats on this day', 'Busy, try again', 'Only your own agenda', 'Professional already has an account',
       'Invalid or expired invite', 'Already a member of this business', 'Professional is inactive',
-      'Professional has no linked account']) {
+      'Professional has no linked account', 'Business not found', 'Too many holds', 'Hold expired', 'Invalid code',
+      'Booking expired', 'Too many attempts', 'Email unavailable, try again']) {
       expect(translate(m), m).not.toBe(GENERIC_ERROR)
     }
   })

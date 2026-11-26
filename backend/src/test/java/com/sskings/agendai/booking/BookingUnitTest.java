@@ -29,7 +29,8 @@ class BookingUnitTest {
     @DisplayName("Duração máxima de um agendamento = limites do catálogo (as consultas por período dependem disso)")
     void longest() {
         assertThat(BookingService.LONGEST).isEqualTo(java.time.Duration.ofMinutes(600));
-        assertThat(BookingStatus.OCCUPYING).containsExactlyInAnyOrder(BookingStatus.CONFIRMED, BookingStatus.COMPLETED, BookingStatus.NO_SHOW);
+        assertThat(BookingStatus.OCCUPYING).as("o mesmo predicado da restrição de exclusão (V4)")
+                .containsExactlyInAnyOrder(BookingStatus.PENDING, BookingStatus.CONFIRMED, BookingStatus.COMPLETED, BookingStatus.NO_SHOW);
     }
 
     @Test
@@ -56,5 +57,15 @@ class BookingUnitTest {
         assertThat(b.getCreatedAt()).isEqualTo(now);
         b.stored();
         assertThat(b.isNew()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Hash do código leva o id do agendamento: o mesmo código em outro agendamento dá outro hash")
+    void codeHash() {
+        UUID a = UUID.randomUUID();
+        UUID b = UUID.randomUUID();
+        assertThat(BookingService.codeHash(a, "123456")).hasSize(64).isEqualTo(BookingService.codeHash(a, "123456"));
+        assertThat(BookingService.codeHash(a, "123456")).isNotEqualTo(BookingService.codeHash(b, "123456"))
+                .isNotEqualTo(BookingService.codeHash(a, "123457"));
     }
 }

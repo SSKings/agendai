@@ -81,6 +81,14 @@ class ArchitectureTest {
                 .orShould().callMethod(com.sskings.agendai.catalog.CatalogService.class, "activeProfessionalsFor", java.util.UUID.class, java.util.UUID.class)
                 .orShould().callMethod(com.sskings.agendai.tenant.PublicAccess.class, "enter", String.class)
                 .check(APP);
+        // agendar pela página (sem guard próprio): só a página pública chama
+        noClasses().that().resideOutsideOfPackages("..publicbooking..", "..booking..")
+                .should().callMethodWhere(com.tngtech.archunit.core.domain.JavaCall.Predicates.target(
+                        com.tngtech.archunit.core.domain.properties.HasOwner.Predicates.With.owner(
+                                com.tngtech.archunit.core.domain.JavaClass.Predicates.type(com.sskings.agendai.booking.BookingService.class)))
+                        .and(com.tngtech.archunit.core.domain.JavaCall.Predicates.target(
+                                com.tngtech.archunit.core.domain.properties.HasName.Predicates.nameMatching("createPending|confirm|abandon"))))
+                .check(APP);
         noClasses().that().resideOutsideOfPackages("..publicbooking..", "..schedule..")
                 .should().callMethod(com.sskings.agendai.schedule.ScheduleService.class, "slots", java.util.UUID.class, java.util.UUID.class,
                         java.util.UUID.class, java.time.LocalDate.class)

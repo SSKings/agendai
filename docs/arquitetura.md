@@ -36,10 +36,10 @@
 | `tenant` | Estabelecimento, equipe (participações), papéis (`OWNER` dono, `PROFESSIONAL` profissional); guard `TenantAccess` |
 | `catalog` | Serviços (duração, intervalo, preço em centavos) e profissionais com os serviços que cada um faz; até 100 serviços e 50 profissionais por estabelecimento (listas sempre limitadas); convites para a equipe (vínculo profissional ↔ conta) e `CatalogService.actor` (quem age por qual profissional), usado pela agenda e pelos agendamentos |
 | `schedule` | Expediente semanal por profissional (até 28 faixas), bloqueios e feriados (até 200 futuros por estabelecimento), cálculo de horários livres; usa o catálogo e o estabelecimento só pela API pública deles (`CatalogService.requireProfessional`/`offer`, `TenantService.zoneOf`) |
-| `booking` | Agendamentos (criar, cancelar, atendido, falta; remarcar e reservas temporárias na fase 2) e clientes (ADR-009); usa `catalog` (`offer`), `schedule` (`calendar`; implementa a porta `BusyPeriods`) e `tenant` (`TenantAccess`, `zoneOf`) — nenhum deles depende de `booking` (ArchUnit) |
-| `publicbooking` | Rotas públicas do cliente (sem login) em `/api/public/{link}`: hoje só leitura (2a); verificação por código e links pessoais na 2b/2c. Entra no estabelecimento pelo guard `tenant.PublicAccess` (função `tenant_by_slug`, V6) e usa as mesmas regras do painel (`ScheduleService.slots`, `CatalogService.activeServices`) |
+| `booking` | Agendamentos (criar, cancelar, atendido, falta; pela página: pendente → confirmado por código) e clientes (ADR-009); usa `catalog` (`offer`), `schedule` (`calendar`; implementa a porta `BusyPeriods`) e `tenant` (`TenantAccess`, `zoneOf`) — nenhum deles depende de `booking` (ArchUnit); os métodos da página (`createPending`, `confirm`, `abandon`) só são chamados por `publicbooking` |
+| `publicbooking` | Rotas públicas do cliente (sem login) em `/api/public/{link}`: leitura (2a) e agendar (2b: reserva de 5 min no Redis — `Holds` —, pendente com código por e-mail, confirmação). Entra no estabelecimento pelo guard `tenant.PublicAccess` (ADR-011) e usa as mesmas regras do painel |
 | `waitlist` | Lista de espera e oferta de vaga |
-| `notification` | Outbox e publicação de eventos (o envio fica no worker) |
+| `notification` | Envio de e-mail (`Mailer`; SMTP do provedor, Mailpit em dev/teste/CI). Na 2b é síncrono, na requisição (código de confirmação); na fase 3 vira outbox + worker (ADR-003) |
 | `auth`, `security` | Login da equipe, tokens, limites, cabeçalhos |
 | `db`, `config`, `common` | Infraestrutura: variáveis do RLS na transação, configuração e validação de produção, erros padronizados |
 | `reporting` | Indicadores do painel |

@@ -66,6 +66,20 @@
         "required" : [ "date", "slots", "timeZone" ],
         "type" : "object"
       },
+      "BookRequest" : {
+        "properties" : {
+          "customer" : {
+            "$ref" : "#/components/schemas/ClientInput"
+          },
+          "holdToken" : {
+            "maxLength" : 64,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "customer", "holdToken" ],
+        "type" : "object"
+      },
       "BookingRequest" : {
         "properties" : {
           "customer" : {
@@ -130,7 +144,7 @@
             "type" : "string"
           },
           "status" : {
-            "enum" : [ "CONFIRMED", "COMPLETED", "NO_SHOW", "CANCELLED" ],
+            "enum" : [ "PENDING", "CONFIRMED", "COMPLETED", "NO_SHOW", "CANCELLED", "EXPIRED" ],
             "type" : "string"
           }
         },
@@ -163,6 +177,46 @@
           }
         },
         "required" : [ "currentPassword", "newPassword" ],
+        "type" : "object"
+      },
+      "ClientInput" : {
+        "properties" : {
+          "email" : {
+            "format" : "email",
+            "maxLength" : 254,
+            "minLength" : 0,
+            "pattern" : "^[^\\p{Cc}\\p{Cf}\\u2028\\u2029]*$",
+            "type" : "string"
+          },
+          "name" : {
+            "maxLength" : 100,
+            "minLength" : 0,
+            "pattern" : "^[^\\p{Cc}\\p{Cf}\\u2028\\u2029]*$",
+            "type" : "string"
+          },
+          "phone" : {
+            "minLength" : 1,
+            "pattern" : "[0-9 ()+.\\-]{10,25}",
+            "type" : "string"
+          }
+        },
+        "required" : [ "email", "name", "phone" ],
+        "type" : "object"
+      },
+      "ConfirmRequest" : {
+        "properties" : {
+          "code" : {
+            "minLength" : 1,
+            "pattern" : "\\d{6}",
+            "type" : "string"
+          },
+          "token" : {
+            "maxLength" : 64,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "code", "token" ],
         "type" : "object"
       },
       "CustomerInput" : {
@@ -206,6 +260,38 @@
           }
         },
         "required" : [ "id", "name", "phone" ],
+        "type" : "object"
+      },
+      "HoldRequest" : {
+        "properties" : {
+          "professionalId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "serviceId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "start" : {
+            "example" : "2026-11-30T09:15",
+            "format" : "local-date-time",
+            "type" : "string"
+          }
+        },
+        "required" : [ "professionalId", "serviceId", "start" ],
+        "type" : "object"
+      },
+      "HoldView" : {
+        "properties" : {
+          "expiresAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "token" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "expiresAt", "token" ],
         "type" : "object"
       },
       "InviteView" : {
@@ -259,6 +345,19 @@
         "required" : [ "email", "id", "name", "tenants" ],
         "type" : "object"
       },
+      "PendingView" : {
+        "properties" : {
+          "expiresAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "token" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "expiresAt", "token" ],
+        "type" : "object"
+      },
       "ProfessionalRequest" : {
         "properties" : {
           "active" : {
@@ -310,6 +409,30 @@
           }
         },
         "required" : [ "active", "hasAccount", "id", "name", "self", "serviceIds" ],
+        "type" : "object"
+      },
+      "PublicBookingView" : {
+        "properties" : {
+          "end" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "professionalName" : {
+            "type" : "string"
+          },
+          "serviceName" : {
+            "type" : "string"
+          },
+          "start" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "status" : {
+            "enum" : [ "PENDING", "CONFIRMED", "COMPLETED", "NO_SHOW", "CANCELLED", "EXPIRED" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "end", "professionalName", "serviceName", "start", "status" ],
         "type" : "object"
       },
       "PublicProfessional" : {
@@ -440,7 +563,7 @@
       "StatusRequest" : {
         "properties" : {
           "status" : {
-            "enum" : [ "CONFIRMED", "COMPLETED", "NO_SHOW", "CANCELLED" ],
+            "enum" : [ "PENDING", "CONFIRMED", "COMPLETED", "NO_SHOW", "CANCELLED", "EXPIRED" ],
             "type" : "string"
           }
         },
@@ -836,6 +959,114 @@
               }
             },
             "description" : "OK"
+          }
+        },
+        "tags" : [ "public-booking-controller" ]
+      }
+    },
+    "/api/public/{slug}/bookings" : {
+      "post" : {
+        "operationId" : "book",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "slug",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/BookRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PendingView"
+                }
+              }
+            },
+            "description" : "Created"
+          }
+        },
+        "tags" : [ "public-booking-controller" ]
+      }
+    },
+    "/api/public/{slug}/bookings/confirm" : {
+      "post" : {
+        "operationId" : "confirm",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "slug",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ConfirmRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PublicBookingView"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "public-booking-controller" ]
+      }
+    },
+    "/api/public/{slug}/holds" : {
+      "post" : {
+        "operationId" : "hold",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "slug",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/HoldRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/HoldView"
+                }
+              }
+            },
+            "description" : "Created"
           }
         },
         "tags" : [ "public-booking-controller" ]

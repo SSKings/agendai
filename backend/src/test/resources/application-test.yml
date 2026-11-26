@@ -9,6 +9,8 @@ spring:
       # espera mais que em produção (5 s, application.yml); o que se mede nesses testes é a regra do banco, não a fila
       connection-timeout: 30000
 agendai:
+  pending:
+    expiry-every: PT1H           # o job de expiração não roda sozinho no meio dos testes (eles o chamam direto)
   jwt:
     secret: test-secret-only-for-tests-0123456789-abcdefghijklmnopqrstuvwxyz
   refresh:

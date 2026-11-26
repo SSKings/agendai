@@ -79,16 +79,20 @@ class ProductionConfigValidatorTest {
     @DisplayName("Configuração correta: a aplicação sobe")
     void validConfigStarts() {
         new ProductionConfigValidator(props(GOOD_SECRET, List.of("https://agendai.app"), true),
-                "jdbc:postgresql://db:5432/agendai", "agendai_app", "agendai_owner", "r3d1s-s3nha-al3atoria-0123");
+                "jdbc:postgresql://db:5432/agendai", "agendai_app", "agendai_owner", "r3d1s-s3nha-al3atoria-0123", "smtp.provedor.com");
     }
 
     @Test
     @DisplayName("Com problema, a aplicação não sobe e a mensagem lista todos")
     void failsFast() {
-        assertThatThrownBy(() -> new ProductionConfigValidator(props("x", List.of(), false), "", "postgres", "postgres", ""))
+        assertThatThrownBy(() -> new ProductionConfigValidator(props("x", List.of(), false), "", "postgres", "postgres", "", " "))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("JWT_SECRET").hasMessageContaining("CORS_ALLOWED_ORIGINS").hasMessageContaining("DATABASE_URL")
-                .hasMessageContaining("DATABASE_USERNAME").hasMessageContaining("REDIS_PASSWORD").hasMessageContaining("secure-cookie");
+                .hasMessageContaining("DATABASE_USERNAME").hasMessageContaining("REDIS_PASSWORD").hasMessageContaining("secure-cookie")
+                .hasMessageContaining("MAIL_HOST");
+        assertThatThrownBy(() -> new ProductionConfigValidator(props(GOOD_SECRET, List.of("https://agendai.app"), true),
+                "jdbc:postgresql://db:5432/agendai", "agendai_app", "agendai_owner", "r3d1s-s3nha-al3atoria-0123", null))
+                .hasMessageContaining("MAIL_HOST").hasMessageNotContaining("JWT_SECRET");
     }
 
     @Test

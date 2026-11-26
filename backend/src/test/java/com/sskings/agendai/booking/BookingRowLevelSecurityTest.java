@@ -129,7 +129,9 @@ class BookingRowLevelSecurityTest extends IntegrationTest {
                         timestamptz '2026-12-01 12:00Z', timestamptz '2026-12-01 22:00Z', timestamptz '2026-12-01 22:05Z', 'CANCELLED', 0, now(), now())""")
                 .setParameter("t", eve).setParameter("p", s.eve().joao()).setParameter("s", s.eve().corte()).setParameter("c", customer)
                 .executeUpdate())).as("mais de 10 h ocupadas").hasMessageContaining("bookings_check");
-        assertThatThrownBy(() -> insert(s, eve, s.eve().joao(), s.eve().corte(), customer, "PENDING")).hasMessageContaining("bookings_status_check");
+        assertThatThrownBy(() -> insert(s, eve, s.eve().joao(), s.eve().corte(), customer, "PAID")).hasMessageContaining("bookings_status_check");
+        assertThatThrownBy(() -> insert(s, eve, s.eve().joao(), s.eve().corte(), customer, "PENDING"))
+                .as("pendente sem prazo, código e token").hasMessageContaining("bookings_pending_check");
         assertThatThrownBy(() -> asEve(s, st -> em.createNativeQuery(
                 "INSERT INTO customers (id, tenant_id, name, phone, created_at) VALUES (gen_random_uuid(), cast(:t as uuid), 'x', '119', now())")
                 .setParameter("t", eve).executeUpdate())).hasMessageContaining("customers_phone_check");

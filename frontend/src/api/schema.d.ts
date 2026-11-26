@@ -148,6 +148,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/public/{slug}/bookings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["book"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/public/{slug}/bookings/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["confirm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/public/{slug}/holds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["hold"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/public/{slug}/services": {
         parameters: {
             query?: never;
@@ -413,6 +461,10 @@ export interface components {
             slots: string[];
             timeZone: string;
         };
+        BookRequest: {
+            customer: components["schemas"]["ClientInput"];
+            holdToken: string;
+        };
         BookingRequest: {
             customer: components["schemas"]["CustomerInput"];
             note?: string;
@@ -443,7 +495,7 @@ export interface components {
             /** Format: date-time */
             start: string;
             /** @enum {string} */
-            status: "CONFIRMED" | "COMPLETED" | "NO_SHOW" | "CANCELLED";
+            status: "PENDING" | "CONFIRMED" | "COMPLETED" | "NO_SHOW" | "CANCELLED" | "EXPIRED";
         };
         BusinessView: {
             name: string;
@@ -452,6 +504,16 @@ export interface components {
         ChangePasswordRequest: {
             currentPassword: string;
             newPassword: string;
+        };
+        ClientInput: {
+            /** Format: email */
+            email: string;
+            name: string;
+            phone: string;
+        };
+        ConfirmRequest: {
+            code: string;
+            token: string;
         };
         CustomerInput: {
             /** Format: email */
@@ -465,6 +527,22 @@ export interface components {
             id: string;
             name: string;
             phone: string;
+        };
+        HoldRequest: {
+            /** Format: uuid */
+            professionalId: string;
+            /** Format: uuid */
+            serviceId: string;
+            /**
+             * Format: local-date-time
+             * @example 2026-11-30T09:15
+             */
+            start: string;
+        };
+        HoldView: {
+            /** Format: date-time */
+            expiresAt: string;
+            token: string;
         };
         InviteView: {
             code: string;
@@ -482,6 +560,11 @@ export interface components {
             name: string;
             tenants: components["schemas"]["TenantView"][];
         };
+        PendingView: {
+            /** Format: date-time */
+            expiresAt: string;
+            token: string;
+        };
         ProfessionalRequest: {
             active: boolean;
             name: string;
@@ -495,6 +578,16 @@ export interface components {
             name: string;
             self: boolean;
             serviceIds: string[];
+        };
+        PublicBookingView: {
+            /** Format: date-time */
+            end: string;
+            professionalName: string;
+            serviceName: string;
+            /** Format: date-time */
+            start: string;
+            /** @enum {string} */
+            status: "PENDING" | "CONFIRMED" | "COMPLETED" | "NO_SHOW" | "CANCELLED" | "EXPIRED";
         };
         PublicProfessional: {
             /** Format: uuid */
@@ -541,7 +634,7 @@ export interface components {
         };
         StatusRequest: {
             /** @enum {string} */
-            status: "CONFIRMED" | "COMPLETED" | "NO_SHOW" | "CANCELLED";
+            status: "PENDING" | "CONFIRMED" | "COMPLETED" | "NO_SHOW" | "CANCELLED" | "EXPIRED";
         };
         TenantView: {
             /** Format: uuid */
@@ -807,6 +900,84 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["AvailabilityView"];
+                };
+            };
+        };
+    };
+    book: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BookRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PendingView"];
+                };
+            };
+        };
+    };
+    confirm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PublicBookingView"];
+                };
+            };
+        };
+    };
+    hold: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HoldRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["HoldView"];
                 };
             };
         };

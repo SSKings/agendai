@@ -14,10 +14,11 @@ import java.util.UUID;
 class BookingBusyPeriods implements BusyPeriods {
 
     private final BookingRepository bookings;
+    private final java.time.Clock clock;
 
     @Override
     public List<Busy> busy(UUID tenantId, UUID professionalId, Instant from, Instant to) {
-        return bookings.occupying(tenantId, professionalId, BookingStatus.OCCUPYING, from.minus(BookingService.LONGEST), from, to).stream()
+        return bookings.occupying(tenantId, professionalId, BookingStatus.OCCUPYING, clock.instant(), from.minus(BookingService.LONGEST), from, to).stream()
                 .map(b -> new Busy(b.getStartsAt(), b.getBlockedUntil()))
                 .toList();
     }

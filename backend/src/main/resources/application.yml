@@ -35,6 +35,19 @@ spring:
     user: ${DATABASE_MIGRATION_USERNAME:}
     password: ${DATABASE_MIGRATION_PASSWORD:}
     locations: classpath:db/migration,classpath:db/callback
+  mail:
+    # SMTP do provedor (produção: ProductionConfigValidator exige o host). STARTTLS obrigatório fora de dev/teste.
+    host: ${MAIL_HOST:}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail.smtp.auth: ${MAIL_AUTH:true}
+      mail.smtp.starttls.enable: true
+      mail.smtp.starttls.required: ${MAIL_STARTTLS_REQUIRED:true}
+      mail.smtp.connectiontimeout: 3000     # provedor lento não segura a requisição do cliente
+      mail.smtp.timeout: 5000
+      mail.smtp.writetimeout: 5000
   data:
     redis:
       host: ${REDIS_HOST:localhost}
@@ -87,6 +100,8 @@ agendai:
     auth-per-minute: ${AUTH_RATE_LIMIT_PER_MINUTE:20}   # por IP, no Redis (vale entre instâncias)
     public-per-minute: ${PUBLIC_RATE_LIMIT_PER_MINUTE:120}   # página pública: uma pessoa navegando nunca chega perto
     public-per-business-minute: ${PUBLIC_RATE_LIMIT_PER_BUSINESS_MINUTE:1200}   # todas as origens somadas, por estabelecimento
+  mail:
+    from: ${MAIL_FROM:Agendaí <nao-responda@agendai.app>}
   max-request-bytes: 65536       # a API só recebe JSON pequeno
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:}

@@ -78,7 +78,15 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD:?}
       JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:?defina CORS_ALLOWED_ORIGINS}
-    networks: [edge, data]
+      # SMTP do provedor (código de confirmação do agendamento): STARTTLS obrigatório por padrão
+      MAIL_HOST: ${MAIL_HOST:?defina MAIL_HOST}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-Agendaí <nao-responda@agendai.app>}
+      MAIL_AUTH: ${MAIL_AUTH:-true}
+      MAIL_STARTTLS_REQUIRED: ${MAIL_STARTTLS_REQUIRED:-true}
+    networks: [edge, data]          # edge: sai para o SMTP do provedor
     mem_limit: ${API_MEM_LIMIT:-768m}
     read_only: true
     tmpfs: [/tmp]

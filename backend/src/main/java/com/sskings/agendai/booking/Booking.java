@@ -9,6 +9,7 @@ import jakarta.persistence.PostLoad;
 import jakarta.persistence.PostPersist;
 import jakarta.persistence.Table;
 import jakarta.persistence.Transient;
+import org.hibernate.annotations.DynamicUpdate;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -23,6 +24,7 @@ import java.util.UUID;
  */
 @Entity
 @Table(name = "bookings")
+@DynamicUpdate   // UPDATE só do que mudou: as tentativas do código são contadas por UPDATE direto (BookingRepository)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 class Booking implements Persistable<UUID> {
@@ -71,6 +73,30 @@ class Booking implements Persistable<UUID> {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    /** Pela página pública: até quando o código vale (e o pendente segura o horário). */
+    @Column(name = "pending_until")
+    private Instant pendingUntil;
+
+    @Column(name = "code_hash", length = 64)
+    private String codeHash;
+
+    @Column(name = "code_attempts", nullable = false, insertable = false, updatable = false)
+    private int codeAttempts;
+
+    @Column(name = "access_hash", length = 64, updatable = false)
+    private String accessHash;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 8, updatable = false)
+    private BookingSource source = BookingSource.PANEL;
+
+    /** Pela página: quem confirmou o código (o cadastro por telefone pode ser de outra pessoa). */
+    @Column(name = "contact_name", length = 100, updatable = false)
+    private String contactName;
+
+    @Column(name = "contact_email", length = 254, updatable = false)
+    private String contactEmail;
+
     Booking(UUID tenantId, UUID professionalId, UUID serviceId, UUID customerId, Instant startsAt, Instant endsAt,
             Instant blockedUntil, int priceCents, String note, Instant now) {
         this.id = UUID.randomUUID();
@@ -87,6 +113,21 @@ class Booking implements Persistable<UUID> {
         this.note = note;
         this.createdAt = now;
         this.updatedAt = now;
+    }
+
+    /** Agendamento pela página pública: PENDING até o cliente confirmar o código (só os hashes ficam no banco). */
+    static Booking pending(UUID tenantId, UUID professionalId, UUID serviceId, UUID customerId, Instant startsAt, Instant endsAt,
+                           Instant blockedUntil, int priceCents, Instant now, Instant pendingUntil, java.util.function.Function<UUID, String> codeHashOf,
+                           String accessHash, String contactName, String contactEmail) {
+        Booking b = new Booking(tenantId, professionalId, serviceId, customerId, startsAt, endsAt, blockedUntil, priceCents, null, now);
+        b.status = BookingStatus.PENDING;
+        b.source = BookingSource.PUBLIC;
+        b.pendingUntil = pendingUntil;
+        b.codeHash = codeHashOf.apply(b.id);
+        b.accessHash = accessHash;
+        b.contactName = contactName;
+        b.contactEmail = contactEmail;
+        return b;
     }
 
     void changeStatus(BookingStatus status, Instant now) {

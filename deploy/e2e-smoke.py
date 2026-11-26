@@ -10,6 +10,7 @@ estabelecimentos e cabeçalhos de segurança. Os dados ficam no banco (use num a
 O nginx limita entrada/cadastro a 10/min por IP: rodar duas vezes seguidas pode dar 429; espere 1 minuto.
 """
 import json
+import os
 import ssl
 import sys
 import urllib.error
@@ -63,6 +64,23 @@ def set_cookie(hdrs):
 
 def refresh(cookie, csrf=True):
     return call("POST", "/api/auth/refresh", cookie=cookie, headers={"X-Requested-With": "agendai"} if csrf else None)
+
+
+def mailpit_code(base_url, to):
+    """Código de 6 dígitos do último e-mail para `to` no Mailpit do CI (espera até 10 s)."""
+    import re
+    import time
+    import urllib.parse
+    for _ in range(20):
+        q = urllib.parse.quote(f'to:"{to}"')
+        with urllib.request.urlopen(f"{base_url}/api/v1/search?query={q}", timeout=5) as r:
+            found = json.loads(r.read())
+        if found.get("messages"):
+            with urllib.request.urlopen(f"{base_url}/api/v1/message/{found['messages'][0]['ID']}", timeout=5) as r:
+                m = re.search(r"\b(\d{6})\b", json.loads(r.read())["Text"])
+                return m.group(1) if m else None
+        time.sleep(0.5)
+    return None
 
 
 def check(name, cond, detail=""):
@@ -146,6 +164,26 @@ def main():
     check("horários livres públicos iguais aos do painel, sem dados de clientes", s == 200 and pav == panel
           and "Cliente" not in json.dumps(pav), pav)
     check("link inexistente: 404", call("GET", "/api/public/nao-existe-mesmo")[0] == 404)
+
+    # ---- agendar pela página (fase 2b): reserva → código no e-mail → confirmado (só com o SMTP de teste do CI) ----
+    mailpit = os.environ.get("MAILPIT_URL")
+    if mailpit and pav["slots"]:
+        start = pav["slots"][0][:16]
+        s, held, _ = call("POST", pub + "/holds", body={"serviceId": svc["id"], "professionalId": pro["id"], "start": start})
+        check("página pública segura o horário por 5 min", s == 201 and len(held["token"]) == 43, held)
+        check("o mesmo horário não é segurado duas vezes", call("POST", pub + "/holds",
+              body={"serviceId": svc["id"], "professionalId": pro["id"], "start": start})[0] == 409)
+        to = f"e2e-{uuid.uuid4().hex[:10]}@teste.com"
+        s, pend, _ = call("POST", pub + "/bookings", body={"holdToken": held["token"],
+                          "customer": {"name": "Cliente Online", "phone": "(11) 95555-0000", "email": to}})
+        check("dados do cliente: pendente criado e código enviado", s == 201, pend)
+        code = mailpit_code(mailpit, to)
+        check("o código chega por e-mail", code is not None, code)
+        s, done, _ = call("POST", pub + "/bookings/confirm", body={"token": pend["token"], "code": code})
+        check("código certo confirma o agendamento", s == 200 and done["status"] == "CONFIRMED", done)
+        s, ag, _ = call("GET", f"{base}/bookings?from={day}&to={day}", ana["accessToken"])
+        check("o agendamento online aparece na agenda do dono", any(b["customer"]["name"] == "Cliente Online"
+              and b["status"] == "CONFIRMED" for b in ag["bookings"]), ag)
 
     # ---- convite (fase 1d): o profissional entra com a própria conta e só vê a própria agenda ----
     s, inv, _ = call("POST", f"{base}/professionals/{pro['id']}/invite", ana["accessToken"])

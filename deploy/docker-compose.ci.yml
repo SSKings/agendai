@@ -1,0 +1,13 @@
+# Só no CI (teste ponta a ponta): um SMTP de mentira no lugar do provedor, para o E2E ler o código de confirmação pela
+# API do Mailpit (127.0.0.1:18025). Nunca em produção. Uso: -f docker-compose.prod.yml -f docker-compose.ci.yml
+services:
+  mailpit:
+    image: axllent/mailpit:v1.27@sha256:e22dce5b36f93c77082e204a3942fb6b283b7896e057458400a4c88344c3df68
+    networks: [edge]
+    ports:
+      - "127.0.0.1:18025:8025"
+
+  api:
+    depends_on:
+      mailpit:
+        condition: service_started

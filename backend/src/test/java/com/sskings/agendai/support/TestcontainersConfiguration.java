@@ -21,6 +21,8 @@ public class TestcontainersConfiguration {
     static final String REDIS_IMAGE =
             "redis:7.4-alpine@sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe";
     static final String REDIS_PASSWORD = "redis-test-password";
+    static final String MAILPIT_IMAGE =
+            "axllent/mailpit:v1.27@sha256:e22dce5b36f93c77082e204a3942fb6b283b7896e057458400a4c88344c3df68";
 
     @Bean(initMethod = "start", destroyMethod = "stop")
     PostgreSQLContainer postgres() {
@@ -36,8 +38,19 @@ public class TestcontainersConfiguration {
                 .withCommand("redis-server", "--requirepass", REDIS_PASSWORD);
     }
 
+    /** SMTP de teste: guarda os e-mails e os mostra por uma API HTTP (MailBox lê o código de confirmação). */
+    @Bean(initMethod = "start", destroyMethod = "stop")
+    GenericContainer<?> mailpit() {
+        return new GenericContainer<>(DockerImageName.parse(MAILPIT_IMAGE)).withExposedPorts(1025, 8025);
+    }
+
     @Bean
-    DynamicPropertyRegistrar containers(PostgreSQLContainer postgres, GenericContainer<?> redis) {
+    MailBox mailBox(GenericContainer<?> mailpit) {
+        return new MailBox("http://" + mailpit.getHost() + ":" + mailpit.getMappedPort(8025));
+    }
+
+    @Bean
+    DynamicPropertyRegistrar containers(PostgreSQLContainer postgres, GenericContainer<?> redis, GenericContainer<?> mailpit) {
         return r -> {
             r.add("spring.datasource.url", postgres::getJdbcUrl);
             r.add("spring.datasource.username", () -> "agendai_app");
@@ -47,6 +60,10 @@ public class TestcontainersConfiguration {
             r.add("spring.data.redis.host", redis::getHost);
             r.add("spring.data.redis.port", () -> redis.getMappedPort(6379));
             r.add("spring.data.redis.password", () -> REDIS_PASSWORD);
+            r.add("spring.mail.host", mailpit::getHost);
+            r.add("spring.mail.port", () -> mailpit.getMappedPort(1025));
+            r.add("spring.mail.properties.mail.smtp.auth", () -> "false");
+            r.add("spring.mail.properties.mail.smtp.starttls.required", () -> "false");
         };
     }
 

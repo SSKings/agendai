@@ -37,6 +37,9 @@ cd backend && ./mvnw spring-boot:run     # sobe PostgreSQL (com os três usuári
 cd frontend && npm ci && npm run dev     # http://localhost:5173 (chama a API pelo proxy /api)
 ```
 
+E-mails de desenvolvimento (código de confirmação do agendamento pela página pública): caixa do Mailpit em
+http://localhost:8025 (sobe junto com o compose.yaml).
+
 Documentação interativa da API (só em dev): http://localhost:8080/swagger-ui.html
 
 Pilha de produção (nginx com TLS, API, PostgreSQL, Redis), como o CI sobe: veja o cabeçalho de

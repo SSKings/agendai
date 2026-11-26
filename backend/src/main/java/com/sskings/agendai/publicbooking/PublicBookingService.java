@@ -16,6 +16,11 @@ import com.sskings.agendai.catalog.CatalogService.PublicService;
 import com.sskings.agendai.schedule.ScheduleDtos.AvailabilityView;
 import com.sskings.agendai.schedule.ScheduleService;
 import com.sskings.agendai.tenant.PublicAccess;
+import com.sskings.agendai.tenant.TenantService;
+import com.sskings.agendai.publicbooking.PublicDtos.RescheduleRequest;
+import com.sskings.agendai.publicbooking.PublicDtos.TokenRequest;
+
+import java.time.Instant;
 import com.sskings.agendai.tenant.PublicAccess.PublicBusiness;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -30,6 +35,7 @@ import java.util.UUID;
  * código por e-mail → confirmado. Tudo passa pelo guard público (link → estabelecimento no RLS, ADR-011).
  */
 @Component
+@lombok.extern.slf4j.Slf4j
 @RequiredArgsConstructor
 public class PublicBookingService {
 
@@ -40,13 +46,19 @@ public class PublicBookingService {
     private final Holds holds;
     private final Mailer mailer;
     private final org.springframework.transaction.support.TransactionTemplate tx;
+    private final TenantService tenants;
+    private final java.time.Clock clock;
+    @org.springframework.beans.factory.annotation.Value("${agendai.public-url}")
+    private String publicUrl;
 
-    public record BusinessView(String name, String timeZone) {}
+    /** Nome, fuso e o que o cliente precisa da política: quantos dias a agenda abre e o prazo para mudar. */
+    public record BusinessView(String name, String timeZone, int bookingWindowDays, int cancelUntilHours) {}
 
     @Transactional(readOnly = true)
     public BusinessView business(String slug) {
         PublicBusiness b = access.enter(slug);
-        return new BusinessView(b.name(), b.timeZone());
+        TenantService.Policy p = tenants.policyOf(b.id());
+        return new BusinessView(b.name(), b.timeZone(), p.bookingWindowDays(), p.cancelUntilHours());
     }
 
     @Transactional(readOnly = true)
@@ -83,6 +95,7 @@ public class PublicBookingService {
             PublicBusiness business = access.enter(slug);
             Holds.Hold h = holds.take(r.holdToken());
             if (h == null || !h.tenantId().equals(business.id())) throw ApiException.badRequest(HOLD_EXPIRED);
+            requireNotice(business.id(), h.start());
             return new Created(business, bookings.createPending(business.id(), h.professionalId(), h.serviceId(), h.start(),
                     new BookingDtos.CustomerInput(c.name(), c.phone(), c.email())));
         });
@@ -106,10 +119,102 @@ public class PublicBookingService {
 
     private record Created(PublicBusiness business, BookingService.PendingBooking pending) {}
 
-    /** Código certo → CONFIRMED. As tentativas erradas ficam contadas mesmo com o erro (não desfaz a transação). */
-    @Transactional(noRollbackFor = ApiException.class)
+    /** Aviso por e-mail a mandar depois da transação (null: nenhum). */
+    private record Notice(String to, String subject, String text) {}
+
+    /** Resultado de uma transação: a resposta e o aviso, ou o erro (lançado só depois do commit). */
+    private record Outcome(BookingService.PublicBookingView view, Notice notice, ApiException error) {}
+
+    /**
+     * Código certo → CONFIRMED, e o e-mail com o link pessoal (cancelar/remarcar). A tentativa errada também é gravada:
+     * a transação devolve o erro em vez de lançá-lo (lançado depois do commit).
+     */
     public BookingService.PublicBookingView confirm(String slug, ConfirmRequest r) {
-        return bookings.confirm(access.enter(slug).id(), r.token(), r.code());
+        return finish(tx.execute(s -> {
+            try {
+                PublicBusiness business = access.enter(slug);
+                BookingService.ClientBooking c = bookings.confirm(business.id(), r.token(), r.code());
+                // email null: já estava confirmado (clique duplo) — o aviso saiu da primeira vez
+                Notice n = c.email() == null ? null : new Notice(c.email(), "Agendamento confirmado — " + business.name(), """
+                        Seu agendamento em %s está confirmado: %s com %s, %s.
+
+                        Para cancelar ou remarcar (até %d h antes), use o seu link pessoal — não o compartilhe:
+                        %s
+                        """.formatted(business.name(), c.view().serviceName(), c.view().professionalName(), WHEN.format(c.view().start()),
+                        tenants.policyOf(business.id()).cancelUntilHours(), manageLink(slug, r.token())));
+                return new Outcome(c.view(), n, null);
+            } catch (ApiException e) {
+                return new Outcome(null, null, e);
+            }
+        }));
+    }
+
+    // ---------- link pessoal do cliente (2c) ----------
+
+    @Transactional(readOnly = true)
+    public BookingService.ManagedView lookup(String slug, TokenRequest r) {
+        UUID tenantId = access.enter(slug).id();
+        return bookings.lookup(tenantId, r.token(), tenants.policyOf(tenantId).cancelUntil());
+    }
+
+    public BookingService.PublicBookingView cancel(String slug, TokenRequest r) {
+        return finish(tx.execute(s -> {
+            PublicBusiness business = access.enter(slug);
+            BookingService.ClientBooking c = bookings.cancelByClient(business.id(), r.token(), tenants.policyOf(business.id()).cancelUntil());
+            return new Outcome(c.view(), new Notice(c.email(), "Agendamento cancelado — " + business.name(), """
+                    Seu agendamento em %s foi cancelado: %s com %s, %s.
+                    Se não foi você, fale com o estabelecimento.
+                    """.formatted(business.name(), c.view().serviceName(), c.view().professionalName(), WHEN.format(c.view().start()))), null);
+        }));
+    }
+
+    /** Remarca para um horário já reservado (POST /holds antes, com as mesmas regras de sempre). */
+    public BookingService.PublicBookingView reschedule(String slug, RescheduleRequest r) {
+        return finish(tx.execute(s -> {
+            PublicBusiness business = access.enter(slug);
+            Holds.Hold h = holds.take(r.holdToken());
+            if (h == null || !h.tenantId().equals(business.id())) throw ApiException.badRequest(HOLD_EXPIRED);
+            requireNotice(business.id(), h.start());
+            BookingService.ClientBooking c = bookings.rescheduleByClient(business.id(), r.token(),
+                    tenants.policyOf(business.id()).cancelUntil(), h.professionalId(), h.serviceId(), h.start());
+            return new Outcome(c.view(), new Notice(c.email(), "Agendamento remarcado — " + business.name(), """
+                    Seu agendamento em %s foi remarcado: %s com %s, %s.
+
+                    O seu link pessoal continua o mesmo:
+                    %s
+                    """.formatted(business.name(), c.view().serviceName(), c.view().professionalName(), WHEN.format(c.view().start()),
+                    manageLink(slug, r.token()))), null);
+        }));
+    }
+
+    /**
+     * A reserva dura 5 min: na hora de usá-la, a antecedência mínima é conferida de novo (o horário pode ter entrado
+     * nela enquanto o cliente preenchia).
+     */
+    private void requireNotice(UUID tenantId, java.time.LocalDateTime start) {
+        Instant at = start.atZone(tenants.zoneOf(tenantId)).toInstant();
+        if (at.isBefore(clock.instant().plus(tenants.policyOf(tenantId).minNotice()))) throw ApiException.conflict(Holds.TAKEN);
+    }
+
+    /** O token vai no fragmento (#): o navegador não o manda ao servidor nem o põe no Referer. */
+    private String manageLink(String slug, String token) {
+        return publicUrl.replaceAll("/+$", "") + "/agendar/" + slug + "/gerenciar#" + token;
+    }
+
+    /**
+     * Depois do commit (a transação já devolveu a conexão): o erro guardado sobe; senão o aviso sai — e falhar aqui não
+     * desfaz nada (o cliente já viu o resultado; é "melhor esforço" até o outbox da fase 3, emenda ao ADR-003).
+     */
+    private BookingService.PublicBookingView finish(Outcome o) {
+        if (o.error() != null) throw o.error();
+        if (o.notice() != null) {
+            try {
+                mailer.send(o.notice().to(), o.notice().subject(), o.notice().text());
+            } catch (RuntimeException e) {
+                log.warn("Aviso por e-mail não enviado ({})", o.notice().subject().substring(0, o.notice().subject().indexOf(" — ")));
+            }
+        }
+        return o.view();
     }
 
     private static final java.time.format.DateTimeFormatter WHEN =
@@ -120,12 +225,21 @@ public class PublicBookingService {
         return freeSlots(access.enter(slug).id(), professionalId, serviceId, date);
     }
 
+    /**
+     * Horários livres para o cliente: as regras do painel mais a política do estabelecimento — só até
+     * {@code bookingWindowDays} à frente e a partir de agora + antecedência mínima.
+     */
     private AvailabilityView freeSlots(UUID tenantId, UUID professionalId, UUID serviceId, LocalDate date) {
         // na página pública, tudo que não está "ativo e fazendo o serviço" é o mesmo 404: inativo ou sem vínculo não
         // se distingue de inexistente (o painel responde diferente, para o dono)
         if (catalog.activeProfessionalsFor(tenantId, serviceId).stream().noneMatch(p -> p.id().equals(professionalId))) {
             throw ApiException.notFound("Professional not found");
         }
-        return schedule.slots(tenantId, professionalId, serviceId, date);
+        TenantService.Policy policy = tenants.policyOf(tenantId);
+        LocalDate today = LocalDate.now(clock.withZone(tenants.zoneOf(tenantId)));
+        if (date.isAfter(today.plusDays(policy.bookingWindowDays()))) throw ApiException.badRequest("Date out of range");
+        AvailabilityView all = schedule.slots(tenantId, professionalId, serviceId, date);
+        Instant earliest = clock.instant().plus(policy.minNotice());
+        return new AvailabilityView(all.date(), all.timeZone(), all.slots().stream().filter(s -> !s.toInstant().isBefore(earliest)).toList());
     }
 }

@@ -153,6 +153,14 @@
       },
       "BusinessView" : {
         "properties" : {
+          "bookingWindowDays" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "cancelUntilHours" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
           "name" : {
             "type" : "string"
           },
@@ -160,7 +168,7 @@
             "type" : "string"
           }
         },
-        "required" : [ "name", "timeZone" ],
+        "required" : [ "bookingWindowDays", "cancelUntilHours", "name", "timeZone" ],
         "type" : "object"
       },
       "ChangePasswordRequest" : {
@@ -323,6 +331,22 @@
         "required" : [ "email", "password" ],
         "type" : "object"
       },
+      "ManagedView" : {
+        "properties" : {
+          "booking" : {
+            "$ref" : "#/components/schemas/PublicBookingView"
+          },
+          "changeUntil" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "changeable" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "booking", "changeUntil", "changeable" ],
+        "type" : "object"
+      },
       "MeResponse" : {
         "properties" : {
           "email" : {
@@ -356,6 +380,30 @@
           }
         },
         "required" : [ "expiresAt", "token" ],
+        "type" : "object"
+      },
+      "Policy" : {
+        "properties" : {
+          "bookingWindowDays" : {
+            "format" : "int32",
+            "maximum" : 180,
+            "minimum" : 1,
+            "type" : "integer"
+          },
+          "cancelUntilHours" : {
+            "format" : "int32",
+            "maximum" : 720,
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "minNoticeMinutes" : {
+            "format" : "int32",
+            "maximum" : 10080,
+            "minimum" : 0,
+            "type" : "integer"
+          }
+        },
+        "required" : [ "bookingWindowDays", "cancelUntilHours", "minNoticeMinutes" ],
         "type" : "object"
       },
       "ProfessionalRequest" : {
@@ -417,7 +465,15 @@
             "format" : "date-time",
             "type" : "string"
           },
+          "professionalId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
           "professionalName" : {
+            "type" : "string"
+          },
+          "serviceId" : {
+            "format" : "uuid",
             "type" : "string"
           },
           "serviceName" : {
@@ -432,7 +488,7 @@
             "type" : "string"
           }
         },
-        "required" : [ "end", "professionalName", "serviceName", "start", "status" ],
+        "required" : [ "end", "professionalId", "professionalName", "serviceId", "serviceName", "start", "status" ],
         "type" : "object"
       },
       "PublicProfessional" : {
@@ -497,6 +553,22 @@
           }
         },
         "required" : [ "businessName", "email", "name", "password" ],
+        "type" : "object"
+      },
+      "RescheduleRequest" : {
+        "properties" : {
+          "holdToken" : {
+            "maxLength" : 64,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "token" : {
+            "maxLength" : 64,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "holdToken", "token" ],
         "type" : "object"
       },
       "ServiceRequest" : {
@@ -642,6 +714,17 @@
           }
         },
         "required" : [ "end", "id", "start" ],
+        "type" : "object"
+      },
+      "TokenRequest" : {
+        "properties" : {
+          "token" : {
+            "maxLength" : 64,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "token" ],
         "type" : "object"
       },
       "UserView" : {
@@ -1000,6 +1083,42 @@
         "tags" : [ "public-booking-controller" ]
       }
     },
+    "/api/public/{slug}/bookings/cancel" : {
+      "post" : {
+        "operationId" : "cancel",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "slug",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/TokenRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PublicBookingView"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "public-booking-controller" ]
+      }
+    },
     "/api/public/{slug}/bookings/confirm" : {
       "post" : {
         "operationId" : "confirm",
@@ -1016,6 +1135,78 @@
             "application/json" : {
               "schema" : {
                 "$ref" : "#/components/schemas/ConfirmRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PublicBookingView"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "public-booking-controller" ]
+      }
+    },
+    "/api/public/{slug}/bookings/lookup" : {
+      "post" : {
+        "operationId" : "lookup",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "slug",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/TokenRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ManagedView"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "public-booking-controller" ]
+      }
+    },
+    "/api/public/{slug}/bookings/reschedule" : {
+      "post" : {
+        "operationId" : "reschedule",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "slug",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RescheduleRequest"
               }
             }
           },
@@ -1156,6 +1347,68 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/TenantView"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "tenant-controller" ]
+      }
+    },
+    "/api/tenants/{id}/policy" : {
+      "get" : {
+        "operationId" : "policy",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Policy"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "tenant-controller" ]
+      },
+      "put" : {
+        "operationId" : "updatePolicy",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/Policy"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Policy"
                 }
               }
             },

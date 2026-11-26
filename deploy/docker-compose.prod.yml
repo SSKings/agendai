@@ -79,6 +79,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:?defina CORS_ALLOWED_ORIGINS}
       # SMTP do provedor (código de confirmação do agendamento): STARTTLS obrigatório por padrão
+      PUBLIC_URL: ${PUBLIC_URL:?defina PUBLIC_URL (https do front, vai nos links dos e-mails)}
       MAIL_HOST: ${MAIL_HOST:?defina MAIL_HOST}
       MAIL_PORT: ${MAIL_PORT:-587}
       MAIL_USERNAME: ${MAIL_USERNAME:-}

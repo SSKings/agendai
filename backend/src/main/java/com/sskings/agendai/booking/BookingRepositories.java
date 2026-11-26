@@ -77,6 +77,11 @@ interface BookingRepository extends JpaRepository<Booking, UUID> {
 
     Optional<Booking> findByTenantIdAndAccessHash(UUID tenantId, String accessHash);
 
+    /** Na remarcação, o token passa para o agendamento novo (índice único): o antigo deixa de responder por ele. */
+    @Modifying
+    @Query(value = "UPDATE bookings SET access_hash = NULL WHERE tenant_id = :tenant AND id = :id", nativeQuery = true)
+    int clearAccess(@Param("tenant") UUID tenantId, @Param("id") UUID id);
+
     /** Conta uma tentativa do código, só enquanto houver tentativas: com pedidos simultâneos, nunca passa de 5. */
     @Modifying
     @Query(value = "UPDATE bookings SET code_attempts = code_attempts + 1 WHERE tenant_id = :tenant AND id = :id AND code_attempts < :max",

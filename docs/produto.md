@@ -55,7 +55,12 @@ decisão do dono).
 - **Confirmação por código** de 6 dígitos no e-mail (impede agendamento falso em nome de outra pessoa e spam): até lá o
   agendamento fica "aguardando o código" na agenda do dono e segura o horário por 10 minutos; código errado 5 vezes
   ou prazo vencido liberam o horário.
-- Link pessoal (de uso restrito, sem login) para **cancelar ou remarcar**, dentro da política.
+- Link pessoal (de uso restrito, sem login) para **cancelar ou remarcar**, dentro da política: vai no e-mail de
+  confirmação e aparece na tela; vale até o fim do atendimento; remarcar mantém o serviço (outro horário ou
+  profissional) e o mesmo link.
+- **Política** (o dono define; o painel não segue): antecedência mínima para agendar pela página (padrão 60 min),
+  até quantas horas antes o cliente cancela ou remarca sozinho (padrão 24 h) e quantos dias à frente a agenda abre
+  (padrão 60, no máximo 180).
 
 **Critérios de aceite:** nunca dois agendamentos sobrepostos para o mesmo profissional, nem sob concorrência; reserva
 temporária expirada libera o horário sozinha; o cliente nunca vê dados de outros clientes.

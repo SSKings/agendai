@@ -72,7 +72,8 @@ public class SecurityConfig {
                      // página pública do estabelecimento: guard próprio por link (PublicAccess, ADR-011)
                      .requestMatchers(HttpMethod.GET, "/api/public/**").permitAll()
                      // reserva, agendamento pendente e confirmação por código (2b): mesmo guard por link
-                     .requestMatchers(HttpMethod.POST, "/api/public/*/holds", "/api/public/*/bookings", "/api/public/*/bookings/confirm").permitAll()
+                     .requestMatchers(HttpMethod.POST, "/api/public/*/holds", "/api/public/*/bookings", "/api/public/*/bookings/confirm",
+                             "/api/public/*/bookings/lookup", "/api/public/*/bookings/cancel", "/api/public/*/bookings/reschedule").permitAll()
                      .requestMatchers("/error").permitAll();
                     if (docs) a.requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll();
                     a.anyRequest().authenticated();

@@ -79,20 +79,20 @@ class ProductionConfigValidatorTest {
     @DisplayName("Configuração correta: a aplicação sobe")
     void validConfigStarts() {
         new ProductionConfigValidator(props(GOOD_SECRET, List.of("https://agendai.app"), true),
-                "jdbc:postgresql://db:5432/agendai", "agendai_app", "agendai_owner", "r3d1s-s3nha-al3atoria-0123", "smtp.provedor.com");
+                "jdbc:postgresql://db:5432/agendai", "agendai_app", "agendai_owner", "r3d1s-s3nha-al3atoria-0123", "smtp.provedor.com", "https://agendai.app");
     }
 
     @Test
     @DisplayName("Com problema, a aplicação não sobe e a mensagem lista todos")
     void failsFast() {
-        assertThatThrownBy(() -> new ProductionConfigValidator(props("x", List.of(), false), "", "postgres", "postgres", "", " "))
+        assertThatThrownBy(() -> new ProductionConfigValidator(props("x", List.of(), false), "", "postgres", "postgres", "", " ", "http://inseguro"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("JWT_SECRET").hasMessageContaining("CORS_ALLOWED_ORIGINS").hasMessageContaining("DATABASE_URL")
                 .hasMessageContaining("DATABASE_USERNAME").hasMessageContaining("REDIS_PASSWORD").hasMessageContaining("secure-cookie")
-                .hasMessageContaining("MAIL_HOST");
+                .hasMessageContaining("MAIL_HOST").hasMessageContaining("PUBLIC_URL");
         assertThatThrownBy(() -> new ProductionConfigValidator(props(GOOD_SECRET, List.of("https://agendai.app"), true),
-                "jdbc:postgresql://db:5432/agendai", "agendai_app", "agendai_owner", "r3d1s-s3nha-al3atoria-0123", null))
-                .hasMessageContaining("MAIL_HOST").hasMessageNotContaining("JWT_SECRET");
+                "jdbc:postgresql://db:5432/agendai", "agendai_app", "agendai_owner", "r3d1s-s3nha-al3atoria-0123", null, null))
+                .hasMessageContaining("MAIL_HOST").hasMessageContaining("PUBLIC_URL").hasMessageNotContaining("JWT_SECRET");
     }
 
     @Test
@@ -109,6 +109,17 @@ class ProductionConfigValidatorTest {
     private static AgendaiProperties props(String secret, List<String> origins, boolean secureCookie) {
         return new AgendaiProperties(new AgendaiProperties.Jwt(secret, 15), new AgendaiProperties.Refresh(30, secureCookie),
                 new AgendaiProperties.Login(5, 15), new AgendaiProperties.RateLimit(20, 120, 1200), 65536, new AgendaiProperties.Cors(origins));
+    }
+
+    @Test
+    @DisplayName("PUBLIC_URL: https com host, sem caminho, consulta nem fragmento")
+    void publicUrl() {
+        assertThat(ProductionConfigValidator.validPublicUrl("https://agendai.app")).isTrue();
+        assertThat(ProductionConfigValidator.validPublicUrl("https://agendai.app:8443")).isTrue();
+        for (String bad : new String[]{"https://", "https:agendai.app", "http://agendai.app", "https://agendai.app/x", "https://agendai.app?a=1",
+                "https://agendai.app#x", "agendai.app", "https://a b", null}) {
+            assertThat(ProductionConfigValidator.validPublicUrl(bad)).as(String.valueOf(bad)).isFalse();
+        }
     }
 
     @Test

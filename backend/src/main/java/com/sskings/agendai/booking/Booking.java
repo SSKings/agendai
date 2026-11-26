@@ -97,6 +97,10 @@ class Booking implements Persistable<UUID> {
     @Column(name = "contact_email", length = 254, updatable = false)
     private String contactEmail;
 
+    /** Remarcações pelo cliente até chegar neste (o novo herda do antigo + 1; no máximo 3). */
+    @Column(nullable = false, updatable = false)
+    private int reschedules;
+
     Booking(UUID tenantId, UUID professionalId, UUID serviceId, UUID customerId, Instant startsAt, Instant endsAt,
             Instant blockedUntil, int priceCents, String note, Instant now) {
         this.id = UUID.randomUUID();
@@ -127,6 +131,18 @@ class Booking implements Persistable<UUID> {
         b.accessHash = accessHash;
         b.contactName = contactName;
         b.contactEmail = contactEmail;
+        return b;
+    }
+
+    /** Remarcação pelo cliente: o mesmo serviço, cliente e contato, já confirmada, levando o token de acesso do antigo. */
+    static Booking rescheduled(Booking old, UUID professionalId, Instant startsAt, Instant endsAt, Instant blockedUntil, int priceCents,
+                               Instant now) {
+        Booking b = new Booking(old.tenantId, professionalId, old.serviceId, old.customerId, startsAt, endsAt, blockedUntil, priceCents, null, now);
+        b.source = BookingSource.PUBLIC;
+        b.accessHash = old.accessHash;
+        b.contactName = old.contactName;
+        b.contactEmail = old.contactEmail;
+        b.reschedules = old.reschedules + 1;
         return b;
     }
 

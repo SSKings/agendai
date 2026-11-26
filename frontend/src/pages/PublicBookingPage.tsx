@@ -33,12 +33,12 @@ export function PublicBookingPage() {
           ))}
         </div>
       </section>
-      {service && <Professionals key={service.id} slug={slug} service={service} timeZone={business.timeZone} />}
+      {service && <Professionals key={service.id} slug={slug} service={service} timeZone={business.timeZone} windowDays={business.bookingWindowDays} />}
     </Shell>
   )
 }
 
-function Professionals({ slug, service, timeZone }: { slug: string; service: PublicService; timeZone: string }) {
+function Professionals({ slug, service, timeZone, windowDays }: { slug: string; service: PublicService; timeZone: string; windowDays: number }) {
   const load = useCallback(() => publicPage.professionals(slug, service.id), [slug, service.id])
   const { data, error } = useLoad(load, 'Não foi possível carregar os profissionais.')
   const [professional, setProfessional] = useState<PublicProfessional | null>(null)
@@ -58,15 +58,26 @@ function Professionals({ slug, service, timeZone }: { slug: string; service: Pub
           ))}
         </div>
       </section>
-      {professional && <Days key={professional.id} slug={slug} service={service} professional={professional} timeZone={timeZone} />}
+      {professional && <Days key={professional.id} slug={slug} service={service} professional={professional} timeZone={timeZone} windowDays={windowDays} />}
     </>
   )
 }
 
-/** Os próximos 14 dias, a partir de hoje no fuso do estabelecimento. */
+/** Até 14 dias, a partir de hoje no fuso do estabelecimento, sem passar da janela da política (hoje + N dias). */
 const DAYS = 14
 
-function Days({ slug, service, professional, timeZone }: { slug: string; service: PublicService; professional: PublicProfessional; timeZone: string }) {
+/**
+ * Dias e horários livres. Sem {@code onPick}, escolher um horário abre o agendamento; com ele (remarcar pelo link
+ * pessoal), o horário escolhido vai para quem chamou.
+ */
+export function Days({ slug, service, professional, timeZone, windowDays, onPick }: {
+  slug: string
+  service: { id: string; name: string }
+  professional: { id: string; name: string }
+  timeZone: string
+  windowDays: number
+  onPick?: (slot: string) => void
+}) {
   const today = todayIn(timeZone)
   const [date, setDate] = useState(today)
   const [chosen, setChosen] = useState<string | null>(null)
@@ -74,7 +85,7 @@ function Days({ slug, service, professional, timeZone }: { slug: string; service
   const { data, error, reload } = useLoad(load, 'Não foi possível consultar os horários.')
   if (chosen) {
     return (
-      <Checkout slug={slug} service={service} professional={professional} slot={chosen} timeZone={timeZone}
+      <Checkout slug={slug} service={service as PublicService} professional={professional} slot={chosen} timeZone={timeZone}
         onBack={() => { setChosen(null); void reload() }} />
     )
   }
@@ -82,7 +93,7 @@ function Days({ slug, service, professional, timeZone }: { slug: string; service
     <section aria-labelledby="dia" className="space-y-3">
       <h2 id="dia" className="font-semibold text-slate-900">3. Dia e horário</h2>
       <div className="flex gap-2 overflow-x-auto pb-1">
-        {Array.from({ length: DAYS }, (_, i) => addDays(today, i)).map((d) => (
+        {Array.from({ length: Math.min(DAYS, windowDays + 1) }, (_, i) => addDays(today, i)).map((d) => (
           <button key={d} type="button" aria-pressed={date === d} onClick={() => setDate(d)}
             className={`shrink-0 rounded-lg px-3 py-1.5 text-sm capitalize ring-1 ${date === d ? 'bg-indigo-600 text-white ring-indigo-600' : 'bg-white text-slate-700 ring-slate-200'}`}>
             {formatDay(d)}
@@ -96,7 +107,7 @@ function Days({ slug, service, professional, timeZone }: { slug: string; service
         <ul aria-label="Horários livres" className="flex flex-wrap gap-2">
           {data.slots.map((s) => (
             <li key={s}>
-              <button type="button" onClick={() => setChosen(s)}
+              <button type="button" onClick={() => (onPick ? onPick(s) : setChosen(s))}
                 className="rounded-lg bg-indigo-50 px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-100">
                 {timeOf(s)}
               </button>
@@ -136,6 +147,11 @@ function Checkout({ slug, service, professional, slot, timeZone, onBack }: {
       <section aria-labelledby="pronto" className="space-y-2 rounded-xl bg-emerald-50 p-4 ring-1 ring-emerald-200">
         <h2 id="pronto" className="font-semibold text-emerald-800">Agendamento confirmado!</h2>
         <p className="text-emerald-800">{done.serviceName} com {done.professionalName}, {formatDay(done.start.slice(0, 10))} às {timeOf(done.start)}.</p>
+        <p className="text-sm text-emerald-800">
+          Para cancelar ou remarcar, use o seu link pessoal (também enviado por e-mail) — não o compartilhe:
+        </p>
+        <input readOnly aria-label="Seu link pessoal" value={`${window.location.origin}/agendar/${slug}/gerenciar#${pending!.token}`}
+          onFocus={(e) => e.target.select()} className="w-full rounded border border-emerald-300 bg-white px-2 py-1 font-mono text-xs" />
       </section>
     )
   }

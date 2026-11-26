@@ -9,6 +9,8 @@ import { AgendaPage } from './pages/AgendaPage'
 import { AvailabilityPage } from './pages/AvailabilityPage'
 import { HomePage } from './pages/HomePage'
 import { HoursPage } from './pages/HoursPage'
+import { ManageBookingPage } from './pages/ManageBookingPage'
+import { PolicyPage } from './pages/PolicyPage'
 import { PublicBookingPage } from './pages/PublicBookingPage'
 import { LoginPage } from './pages/LoginPage'
 import { RegisterPage } from './pages/RegisterPage'
@@ -31,6 +33,7 @@ export function App() {
     <Routes>
       {/* página do cliente: fora do AuthProvider — não tenta renovar sessão da equipe (nem gasta o limite de login do IP) */}
       <Route path="/agendar/:slug" element={<PublicBookingPage />} />
+      <Route path="/agendar/:slug/gerenciar" element={<ManageBookingPage />} />
       <Route path="*" element={<AuthProvider><StaffRoutes /></AuthProvider>} />
     </Routes>
   )
@@ -53,6 +56,7 @@ function StaffRoutes() {
           <Route path="expediente" element={<HoursPage />} />
           <Route path="bloqueios" element={<TimeOffPage />} />
           <Route path="horarios" element={<AvailabilityPage />} />
+          <Route path="politica" element={<PolicyPage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

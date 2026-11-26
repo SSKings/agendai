@@ -62,7 +62,7 @@ jobs:
             classes: com.sskings.agendai.booking.*,com.sskings.agendai.notification.*
             # a regra "profissional só na própria agenda" é testada junto com o convite (quem cria o vínculo); o pendente,
             # o código e o e-mail, pela reserva da página pública
-            tests: com.sskings.agendai.booking.*Test,com.sskings.agendai.catalog.InviteIntegrationTest,com.sskings.agendai.publicbooking.PublicReservationIntegrationTest
+            tests: com.sskings.agendai.booking.*Test,com.sskings.agendai.catalog.InviteIntegrationTest,com.sskings.agendai.publicbooking.PublicReservationIntegrationTest,com.sskings.agendai.publicbooking.ManageLinkIntegrationTest
     defaults:
       run:
         working-directory: backend
@@ -169,6 +169,7 @@ jobs:
           CORS_ALLOWED_ORIGINS=https://localhost:18443
           HTTP_PORT=18080
           HTTPS_PORT=18443
+          PUBLIC_URL=https://localhost:18443
           MAIL_HOST=mailpit
           MAIL_PORT=1025
           MAIL_AUTH=false
@@ -198,10 +199,13 @@ jobs:
             exit 0
           fi
           cp -r deploy/.env.prod deploy/certs ../base/deploy/
-          docker compose -p "$PROJECT" -f ../base/deploy/docker-compose.prod.yml --env-file ../base/deploy/.env.prod \
+          # desde a 2b a API depende do SMTP (o health check inclui o e-mail): a base sobe com o Mailpit do CI também
+          files=(-f ../base/deploy/docker-compose.prod.yml)
+          [ -f ../base/deploy/docker-compose.ci.yml ] && files+=(-f ../base/deploy/docker-compose.ci.yml)
+          docker compose -p "$PROJECT" "${files[@]}" --env-file ../base/deploy/.env.prod \
             up -d --build --wait --wait-timeout 300
           bash ../wait-https.sh "$URL"
-          python3 ../base/deploy/e2e-smoke.py "$URL"
+          MAILPIT_URL=http://127.0.0.1:18025 python3 ../base/deploy/e2e-smoke.py "$URL"
           sleep 61   # o nginx limita cadastro/login a 10 por minuto por IP
 
       # Como num deploy de verdade: o banco sobe primeiro e os scripts de db-init (idempotentes: papéis, extensões)

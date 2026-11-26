@@ -26,12 +26,16 @@ public class ProductionConfigValidator {
                                      @Value("${spring.datasource.username:}") String appUser,
                                      @Value("${spring.flyway.user:}") String migrationUser,
                                      @Value("${spring.data.redis.password:}") String redisPassword,
-                                     @Value("${spring.mail.host:}") String mailHost) {
+                                     @Value("${spring.mail.host:}") String mailHost,
+                                     @Value("${agendai.public-url:}") String publicUrl) {
         List<String> problems = new ArrayList<>(problems(props.jwt().secret(), props.cors().allowedOrigins(), databaseUrl));
         problems.addAll(databaseUserProblems(appUser, migrationUser));
         problems.addAll(sessionProblems(redisPassword, props.refresh().secureCookie()));
         if (mailHost == null || mailHost.isBlank()) {
             problems.add("MAIL_HOST: informe o SMTP do provedor (o código de confirmação do agendamento vai por e-mail)");
+        }
+        if (!validPublicUrl(publicUrl)) {
+            problems.add("PUBLIC_URL: informe o endereço https do front, só esquema e host (ex.: https://agendai.app) — vai nos links dos e-mails");
         }
         if (!problems.isEmpty()) {
             throw new IllegalStateException("Configuração de produção insegura:\n - " + String.join("\n - ", problems));
@@ -84,5 +88,16 @@ public class ProductionConfigValidator {
             p.add("DATABASE_USERNAME: a API usa um usuário só de dados, diferente do dono das tabelas e do superusuário");
         }
         return p;
+    }
+
+    /** https, com host, sem caminho, consulta nem fragmento (o link é montado em cima). */
+    static boolean validPublicUrl(String url) {
+        try {
+            java.net.URI u = new java.net.URI(url);
+            return "https".equals(u.getScheme()) && u.getHost() != null && u.getPath().isEmpty()   // com host, há caminho (mesmo vazio)
+                    && u.getQuery() == null && u.getFragment() == null;
+        } catch (java.net.URISyntaxException | NullPointerException e) {
+            return false;
+        }
     }
 }

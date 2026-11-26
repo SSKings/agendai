@@ -20,6 +20,7 @@ export function TenantLayout() {
         <NavLink to="expediente" className={tab}>Expediente</NavLink>
         <NavLink to="bloqueios" className={tab}>Bloqueios</NavLink>
         <NavLink to="horarios" className={tab}>Horários livres</NavLink>
+        <NavLink to="politica" className={tab}>Política</NavLink>
       </nav>
       {/* key: ao trocar de estabelecimento a tela é recriada, e uma resposta atrasada do anterior não a sobrescreve */}
       <div className="mt-6" key={tenant.id}>

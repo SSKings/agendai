@@ -70,6 +70,21 @@ public class PublicBookingController {
         return pages.confirm(slug, body);
     }
 
+    @PostMapping("/bookings/lookup")
+    public BookingService.ManagedView lookup(@PathVariable String slug, @Valid @RequestBody PublicDtos.TokenRequest body) {
+        return pages.lookup(slug, body);
+    }
+
+    @PostMapping("/bookings/cancel")
+    public BookingService.PublicBookingView cancel(@PathVariable String slug, @Valid @RequestBody PublicDtos.TokenRequest body) {
+        return pages.cancel(slug, body);
+    }
+
+    @PostMapping("/bookings/reschedule")
+    public BookingService.PublicBookingView reschedule(@PathVariable String slug, @Valid @RequestBody PublicDtos.RescheduleRequest body) {
+        return pages.reschedule(slug, body);
+    }
+
     @GetMapping("/availability")
     public AvailabilityView availability(@PathVariable String slug, @RequestParam UUID professionalId, @RequestParam UUID serviceId,
                                          @RequestParam @DateTimeFormat(iso = DATE) LocalDate date) {

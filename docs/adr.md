@@ -30,6 +30,10 @@ síncrono, na requisição, porque o outbox e o worker ainda não existem. Para 
 pendente é gravado numa transação própria e o e-mail sai fora dela (provedor lento não segura conexão nem trava); se
 o envio falha, o pendente expira na hora e a resposta é 503 — nada fica valendo sem o código. Na fase 3 o envio passa
 para o outbox.
+**Emenda (fase 2c, temporária até a fase 3):** os avisos ao cliente (confirmado, com o link pessoal; cancelado;
+remarcado) saem depois do commit, fora da transação, e são "melhor esforço": se o provedor falhar, o resultado já
+gravado vale e o aviso se perde (fica no log). O link pessoal também aparece na tela da confirmação. A garantia "pelo
+menos uma vez" deste ADR chega com o outbox da fase 3.
 
 ## ADR-004 — TDD e 100% de cobertura exigidos pelo CI
 
@@ -168,5 +172,9 @@ o RLS esconde tudo — inclusive o estabelecimento dono do link.
   continua valendo sem usuário. Expirar os pendentes vencidos de todos os estabelecimentos é a função
   `expire_pending_bookings` (V7, `SECURITY DEFINER`, um UPDATE idempotente), chamada por um job; os horários livres e a
   criação de agendamento já ignoram o pendente vencido antes disso.
-**Consequência:** a página pública não tem caminho para dados de outro estabelecimento nem de clientes; a regra de
-horários é uma só para painel e página.
+- Link pessoal (2c): o token de acesso do agendamento (256 bits) consulta, cancela e remarca, pelas rotas
+  `/bookings/lookup|cancel|reschedule`, dentro da política do estabelecimento (`TenantService.Policy`): a página e o
+  link seguem a antecedência, a janela e o prazo; o painel não. Remarcar cancela o antigo e cria o novo na mesma
+  transação, passando o token. Avisos por e-mail saem depois do commit e não desfazem nada se falharem.
+**Consequência:** a página pública não tem caminho para dados de outro estabelecimento nem de clientes; os horários
+seguem as mesmas regras do painel, mais a política na página e no link pessoal.

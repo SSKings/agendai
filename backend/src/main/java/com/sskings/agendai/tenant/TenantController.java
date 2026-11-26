@@ -17,4 +17,15 @@ public class TenantController {
     public TenantService.TenantView get(@PathVariable UUID id) {
         return service.get(id);
     }
+
+    @GetMapping("/api/tenants/{id}/policy")
+    public TenantService.Policy policy(@PathVariable UUID id) {
+        return service.policy(id);
+    }
+
+    @org.springframework.web.bind.annotation.PutMapping("/api/tenants/{id}/policy")
+    public TenantService.Policy updatePolicy(@PathVariable UUID id,
+                                             @jakarta.validation.Valid @org.springframework.web.bind.annotation.RequestBody TenantService.Policy body) {
+        return service.updatePolicy(id, body);
+    }
 }

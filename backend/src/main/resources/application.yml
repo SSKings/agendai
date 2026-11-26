@@ -102,6 +102,8 @@ agendai:
     public-per-business-minute: ${PUBLIC_RATE_LIMIT_PER_BUSINESS_MINUTE:1200}   # todas as origens somadas, por estabelecimento
   mail:
     from: ${MAIL_FROM:Agendaí <nao-responda@agendai.app>}
+  # endereço do front para os links nos e-mails (link pessoal do cliente); em produção, só https
+  public-url: ${PUBLIC_URL:http://localhost:5173}
   max-request-bytes: 65536       # a API só recebe JSON pequeno
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:}

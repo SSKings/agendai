@@ -33,11 +33,27 @@ public class Tenant {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    /** Política para o cliente (V8): antecedência mínima, prazo para cancelar/remarcar sozinho, dias que a agenda abre. */
+    @Column(name = "min_notice_minutes", nullable = false)
+    private int minNoticeMinutes = 60;
+
+    @Column(name = "cancel_until_hours", nullable = false)
+    private int cancelUntilHours = 24;
+
+    @Column(name = "booking_window_days", nullable = false)
+    private int bookingWindowDays = 60;
+
     public Tenant(String name, String slug, String timeZone, Instant createdAt) {
         this.id = UUID.randomUUID();
         this.name = name;
         this.slug = slug;
         this.timeZone = timeZone;
         this.createdAt = createdAt;
+    }
+
+    void changePolicy(int minNoticeMinutes, int cancelUntilHours, int bookingWindowDays) {
+        this.minNoticeMinutes = minNoticeMinutes;
+        this.cancelUntilHours = cancelUntilHours;
+        this.bookingWindowDays = bookingWindowDays;
     }
 }

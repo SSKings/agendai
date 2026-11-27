@@ -46,6 +46,19 @@ Ainda pode haver e-mail repetido num caso raro: o provedor aceitou e a transaç�
 ("pelo menos uma vez"). O **código de confirmação continua síncrono**, por decisão: é parte da interação (o
 cliente espera por ele na tela, e a falha vira 503 com o pendente expirado — emenda da 2b), e gravá-lo em claro no
 outbox poria um segredo de 10 minutos no banco e no broker.
+**Emenda (fase 3b1):** o backend roda em três papéis com a mesma imagem (perfis `migrate`, `api` e `worker`; em dev e
+nos testes, sem perfil de papel, um processo faz tudo). O `migrate` aplica as migrações com o dono das tabelas e sai;
+a API e o worker sobem depois dele e não dependem um do outro. A API só atende o HTTP: não tem conexão nem credencial
+do RabbitMQ (o outbox é uma tabela), não roda jobs, não migra. O worker publica o outbox, consome as filas, declara a
+topologia e roda os jobs de manutenção; não tem porta da API (o health fica no localhost do container) e não recebe
+JWT, Redis nem a senha do dono das tabelas. O broker tem um único usuário, o do worker, com permissão só no que é
+`agendai.*` (e no exchange padrão, para a espera e a fila de falhas), criado pelo `rabbitmqctl` via cookie do Erlang
+(`deploy/rabbitmq/init-users.sh`) — sem administrador. Alternativas descartadas: (1) publicador na API, com um usuário
+só de publicação — deixaria credencial do broker no processo exposto à internet, criaria uma corrida na primeira
+subida (a API publicando antes de o worker declarar a topologia) e não ganharia nada: com o worker parado, o e-mail
+não sai de qualquer jeito; (2) a API migrando o banco — daria a ela a senha do dono das tabelas e faria o worker
+esperar a API saudável (que depende do SMTP e do Redis); (3) definições com hash da senha carregadas na partida do
+broker — gerar o hash no deploy é mais frágil que deixar o próprio RabbitMQ gerá-lo.
 
 ## ADR-004 — TDD e 100% de cobertura exigidos pelo CI
 

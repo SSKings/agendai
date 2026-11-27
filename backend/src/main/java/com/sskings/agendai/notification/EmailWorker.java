@@ -3,6 +3,7 @@ package com.sskings.agendai.notification;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageBuilder;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -29,6 +30,7 @@ import java.util.UUID;
  * Encaminhar exige a confirmação do broker; se ela não vem, a exceção devolve a mensagem à fila (nada se perde).
  */
 @Slf4j
+@ConditionalOnBooleanProperty(name = "agendai.worker.enabled", matchIfMissing = true)   // papel worker
 @Component
 public class EmailWorker {
 
@@ -67,7 +69,7 @@ public class EmailWorker {
         }
     }
 
-    @RabbitListener(queues = Messaging.EMAIL_QUEUE, autoStartup = "${agendai.worker.enabled:true}")
+    @RabbitListener(queues = Messaging.EMAIL_QUEUE)
     public void on(Message message) {
         Email email;
         try {

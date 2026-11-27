@@ -3,11 +3,16 @@
 services:
   mailpit:
     image: axllent/mailpit:v1.27@sha256:e22dce5b36f93c77082e204a3942fb6b283b7896e057458400a4c88344c3df68
-    networks: [edge]
+    networks: [edge, egress]        # a API (edge) e o worker (egress) mandam e-mail
     ports:
       - "127.0.0.1:18025:8025"
 
   api:
+    depends_on:
+      mailpit:
+        condition: service_started
+
+  worker:
     depends_on:
       mailpit:
         condition: service_started

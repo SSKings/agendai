@@ -7,6 +7,8 @@ import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.sskings.agendai.config.AgendaiProperties;
 import com.sskings.agendai.user.User;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
@@ -28,9 +30,30 @@ public class JwtService {
     private final Clock clock;
 
     public JwtService(AgendaiProperties props, Clock clock) {
-        this.algorithm = Algorithm.HMAC256(props.jwt().secret());
+        this(props, clock, true);
+    }
+
+    /**
+     * @param required {@code false} só nos papéis sem HTTP da API (worker, migrate), que não recebem o segredo: lá a
+     *                 chave é sorteada e nenhum token vale. Onde a API roda, segredo ausente impede a partida (várias
+     *                 instâncias com chaves sorteadas recusariam os tokens umas das outras).
+     */
+    @Autowired
+    public JwtService(AgendaiProperties props, Clock clock, @Value("${agendai.jwt.required:true}") boolean required) {
+        String secret = props.jwt().secret();
+        boolean blank = secret == null || secret.isBlank();
+        if (blank && required) {
+            throw new IllegalStateException("JWT_SECRET: informe o segredo dos access tokens (openssl rand -base64 48)");
+        }
+        this.algorithm = blank ? Algorithm.HMAC256(randomKey()) : Algorithm.HMAC256(secret);
         this.expirationMinutes = props.jwt().accessMinutes();
         this.clock = clock;
+    }
+
+    private static byte[] randomKey() {
+        byte[] key = new byte[32];
+        new java.security.SecureRandom().nextBytes(key);
+        return key;
     }
 
     public String generate(User user) {

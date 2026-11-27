@@ -1,0 +1,17 @@
+# Papel "migrate" (produção: SPRING_PROFILES_ACTIVE=prod,migrate, serviço que roda uma vez): aplica as migrações do
+# Flyway com o dono das tabelas e sai (MigrateOnly). Sem porta HTTP, sem RabbitMQ, sem componentes de fundo.
+# Contexto web sem porta (server.port -1), como no worker: a configuração de segurança exige um, mas nada escuta.
+server:
+  port: -1
+spring:
+  autoconfigure:
+    exclude: org.springframework.boot.rabbitmq.autoconfigure.RabbitAutoConfiguration
+agendai:
+  jwt:
+    required: false
+  outbox:
+    enabled: false
+  worker:
+    enabled: false
+  jobs:
+    enabled: false

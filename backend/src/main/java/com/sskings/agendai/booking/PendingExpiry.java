@@ -2,6 +2,7 @@ package com.sskings.agendai.booking;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,6 +14,7 @@ import java.time.Clock;
  * várias instâncias: é um UPDATE só, idempotente. Os horários livres já ignoram o pendente vencido mesmo antes disto.
  */
 @Slf4j
+@ConditionalOnBooleanProperty(name = "agendai.jobs.enabled", matchIfMissing = true)   // papel worker
 @Component
 @RequiredArgsConstructor
 class PendingExpiry {

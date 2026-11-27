@@ -2,11 +2,14 @@ package com.sskings.agendai.config;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 /**
  * Perfil prod: a aplicação NÃO sobe com configuração insegura — lista todos os problemas de uma vez.
@@ -16,13 +19,16 @@ import java.util.Locale;
  *   <li>DATABASE_URL de PostgreSQL.</li>
  *   <li>A API conecta com um usuário só de DML, diferente do dono das tabelas (que roda as migrações) e do
  *       superusuário: uma falha de SQL não vira controle do banco (lição da revisão 5 do ShopEasy).</li>
+ *   <li>Cada processo tem um papel — {@code prod,api}, {@code prod,worker} ou {@code prod,migrate} — e só recebe (e
+ *       só é cobrado por) o que usa: RabbitMQ só no worker; JWT, CORS, Redis e endereço do front só na API; o dono
+ *       das tabelas só no migrate.</li>
  * </ul>
  */
 @Component
 @Profile("prod")
 public class ProductionConfigValidator {
 
-    public ProductionConfigValidator(AgendaiProperties props, @Value("${spring.datasource.url:}") String databaseUrl,
+    public ProductionConfigValidator(Environment env, AgendaiProperties props, @Value("${spring.datasource.url:}") String databaseUrl,
                                      @Value("${spring.datasource.username:}") String appUser,
                                      @Value("${spring.flyway.user:}") String migrationUser,
                                      @Value("${spring.data.redis.password:}") String redisPassword,
@@ -30,25 +36,46 @@ public class ProductionConfigValidator {
                                      @Value("${spring.rabbitmq.username:}") String rabbitUser,
                                      @Value("${spring.rabbitmq.password:}") String rabbitPassword,
                                      @Value("${agendai.public-url:}") String publicUrl) {
-        List<String> problems = new ArrayList<>(problems(props.jwt().secret(), props.cors().allowedOrigins(), databaseUrl));
-        problems.addAll(databaseUserProblems(appUser, migrationUser));
-        problems.addAll(sessionProblems(redisPassword, props.refresh().secureCookie()));
-        if (rabbitUser == null || rabbitUser.isBlank()) {
-            problems.add("RABBITMQ_USERNAME: informe o usuário do RabbitMQ");
+        boolean api = env.matchesProfiles("api");
+        boolean worker = env.matchesProfiles("worker");
+        boolean migrate = env.matchesProfiles("migrate");
+        // sem papel, ou com mais de um: recusa e valida tudo (a lista sai completa de uma vez)
+        boolean unknown = (api ? 1 : 0) + (worker ? 1 : 0) + (migrate ? 1 : 0) != 1;
+        Set<String> problems = new LinkedHashSet<>();
+        if (unknown) {
+            problems.add("SPRING_PROFILES_ACTIVE: em produção cada processo tem um papel — prod,api, prod,worker ou prod,migrate");
         }
-        if (rabbitPassword == null || rabbitPassword.length() < 16) {
-            problems.add("RABBITMQ_PASSWORD: informe uma senha aleatória de pelo menos 16 caracteres (openssl rand -hex 24)");
+        if (databaseUrl == null || !databaseUrl.startsWith("jdbc:postgresql:")) problems.add(DATABASE_URL);
+        if (appUser == null || appUser.isBlank() || appUser.equals("postgres")) problems.add(DATABASE_USERNAME);
+        if (api || unknown) {
+            problems.addAll(problems(props.jwt().secret(), props.cors().allowedOrigins(), databaseUrl));
+            problems.addAll(sessionProblems(redisPassword, props.refresh().secureCookie()));
+            if (!validPublicUrl(publicUrl)) {
+                problems.add("PUBLIC_URL: informe o endereço https do front, só esquema e host (ex.: https://agendai.app) — vai nos links dos e-mails");
+            }
         }
-        if (mailHost == null || mailHost.isBlank()) {
-            problems.add("MAIL_HOST: informe o SMTP do provedor (o código de confirmação do agendamento vai por e-mail)");
+        if (worker || unknown) {
+            if (rabbitUser == null || rabbitUser.isBlank()) {
+                problems.add("RABBITMQ_USERNAME: informe o usuário do RabbitMQ");
+            }
+            if (rabbitPassword == null || rabbitPassword.length() < 16) {
+                problems.add("RABBITMQ_PASSWORD: informe uma senha aleatória de pelo menos 16 caracteres (openssl rand -hex 24)");
+            }
         }
-        if (!validPublicUrl(publicUrl)) {
-            problems.add("PUBLIC_URL: informe o endereço https do front, só esquema e host (ex.: https://agendai.app) — vai nos links dos e-mails");
+        if ((api || worker || unknown) && (mailHost == null || mailHost.isBlank())) {
+            problems.add("MAIL_HOST: informe o SMTP do provedor (código de confirmação e avisos do agendamento vão por e-mail)");
+        }
+        if (migrate || unknown) {
+            problems.addAll(databaseUserProblems(appUser, migrationUser));
         }
         if (!problems.isEmpty()) {
             throw new IllegalStateException("Configuração de produção insegura:\n - " + String.join("\n - ", problems));
         }
     }
+
+    private static final String DATABASE_USERNAME =
+            "DATABASE_USERNAME: a aplicação usa um usuário só de dados, diferente do dono das tabelas e do superusuário";
+    private static final String DATABASE_URL = "DATABASE_URL: informe o PostgreSQL de produção (jdbc:postgresql://...)";
 
     static List<String> problems(String jwtSecret, List<String> origins, String databaseUrl) {
         List<String> p = new ArrayList<>();
@@ -70,7 +97,7 @@ public class ProductionConfigValidator {
             }
         }
         if (databaseUrl == null || !databaseUrl.startsWith("jdbc:postgresql:")) {
-            p.add("DATABASE_URL: informe o PostgreSQL de produção (jdbc:postgresql://...)");
+            p.add(DATABASE_URL);
         }
         return p;
     }
@@ -93,7 +120,7 @@ public class ProductionConfigValidator {
             p.add("DATABASE_MIGRATION_USERNAME: informe o dono das tabelas (o Flyway migra com ele)");
         }
         if (appUser == null || appUser.isBlank() || appUser.equals(migrationUser) || appUser.equals("postgres")) {
-            p.add("DATABASE_USERNAME: a API usa um usuário só de dados, diferente do dono das tabelas e do superusuário");
+            p.add(DATABASE_USERNAME);
         }
         return p;
     }

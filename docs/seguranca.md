@@ -39,6 +39,30 @@ A coluna "Teste" aponta o teste que falha sem o controle (ou a fase em que o con
 | Segredo commitado | Varredura de segredos + proteção de push do GitHub; `.env*` no `.gitignore` | `.gitignore`; varredura de segredos e proteção de push: ativar nas configurações do GitHub |
 | Dados pessoais em log ou trace | Logs sem e-mail/telefone (mascarados), traces sem corpo de requisição | parcial: logs da fase 0 usam só ids (nunca e-mail); teste de log: fase 2 |
 
+## Eventos (fase 3a)
+
+- O RabbitMQ fica só na rede interna (`data`), com usuário e senha próprios (o validador de produção exige senha
+  aleatória de 16+ caracteres; o `guest` não existe). Filas *quorum* em disco.
+- O conteúdo do aviso (e-mail do cliente, texto com o link pessoal) fica no `outbox_events` só até ser publicado: ao
+  marcar como publicado, o `payload` vira nulo (`CHECK` garante). O `outbox_events` tem RLS por estabelecimento; o
+  publicador lê por funções `SECURITY DEFINER` que só pegam e marcam.
+- Na fila, a mensagem fica até ser consumida (segundos; até 3 h com o provedor fora); na fila de falhas e na dos não
+  roteados, no máximo 7 dias (TTL e teto de 10 mil). Risco aceito: nesse tempo o link pessoal (token em claro) e o
+  e-mail ficam no disco do RabbitMQ, na rede interna e no volume dele — fora do alcance da anonimização (LGPD). O
+  código de confirmação nunca passa pelo outbox (emenda ao ADR-003).
+- Container do RabbitMQ sem root (usuário da imagem), sem capacidades, sistema de arquivos somente leitura (dados no
+  volume), memória limitada com alarme abaixo do limite (`deploy/rabbitmq/90-agendai.conf`). Portas internas (métricas,
+  distribuição) só na rede `data`.
+- `processed_events` não tem `tenant_id` nem RLS, de propósito: guarda só o id do evento e a hora (nenhum dado de
+  estabelecimento ou cliente).
+- Pendentes (3b): usuários separados para publicar e consumir (hoje o mesmo, com acesso a tudo no vhost); EXECUTE de
+  `outbox_claim`/`outbox_published` restrito ao papel da API (junto com o das V7/V9).
+- Testes: `OutboxIntegrationTest` (RabbitMQ fora → o aviso sai quando volta; duplicado → um e-mail; evento travado
+  por outra instância → pulado, e o livre ao lado sai na hora; malformado → fila de falhas; fila de espera devolve;
+  sem fila → não roteados), `OutboxRowLevelSecurityTest` (RLS; aviso desfeito com a transação; fora de transação,
+  recusado), `EmailWorkerTest` (espera × fila de falhas), `ManageLinkIntegrationTest.noticeFailureKeepsResult`
+  (provedor fora por mais que uma tentativa) e a regra ArchUnit "RabbitMQ só pelo `notification`".
+
 ## Riscos aceitos (revisão da fase 0)
 
 | Risco | Por que aceito agora | Mitigação atual | Quando resolver |

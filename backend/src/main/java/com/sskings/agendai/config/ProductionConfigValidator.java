@@ -27,10 +27,18 @@ public class ProductionConfigValidator {
                                      @Value("${spring.flyway.user:}") String migrationUser,
                                      @Value("${spring.data.redis.password:}") String redisPassword,
                                      @Value("${spring.mail.host:}") String mailHost,
+                                     @Value("${spring.rabbitmq.username:}") String rabbitUser,
+                                     @Value("${spring.rabbitmq.password:}") String rabbitPassword,
                                      @Value("${agendai.public-url:}") String publicUrl) {
         List<String> problems = new ArrayList<>(problems(props.jwt().secret(), props.cors().allowedOrigins(), databaseUrl));
         problems.addAll(databaseUserProblems(appUser, migrationUser));
         problems.addAll(sessionProblems(redisPassword, props.refresh().secureCookie()));
+        if (rabbitUser == null || rabbitUser.isBlank()) {
+            problems.add("RABBITMQ_USERNAME: informe o usuário do RabbitMQ");
+        }
+        if (rabbitPassword == null || rabbitPassword.length() < 16) {
+            problems.add("RABBITMQ_PASSWORD: informe uma senha aleatória de pelo menos 16 caracteres (openssl rand -hex 24)");
+        }
         if (mailHost == null || mailHost.isBlank()) {
             problems.add("MAIL_HOST: informe o SMTP do provedor (o código de confirmação do agendamento vai por e-mail)");
         }

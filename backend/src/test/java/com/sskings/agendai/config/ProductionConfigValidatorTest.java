@@ -79,20 +79,23 @@ class ProductionConfigValidatorTest {
     @DisplayName("Configuração correta: a aplicação sobe")
     void validConfigStarts() {
         new ProductionConfigValidator(props(GOOD_SECRET, List.of("https://agendai.app"), true),
-                "jdbc:postgresql://db:5432/agendai", "agendai_app", "agendai_owner", "r3d1s-s3nha-al3atoria-0123", "smtp.provedor.com", "https://agendai.app");
+                "jdbc:postgresql://db:5432/agendai", "agendai_app", "agendai_owner", "r3d1s-s3nha-al3atoria-0123", "smtp.provedor.com",
+                "agendai", "r4bb1t-s3nha-al3atoria-01", "https://agendai.app");
     }
 
     @Test
     @DisplayName("Com problema, a aplicação não sobe e a mensagem lista todos")
     void failsFast() {
-        assertThatThrownBy(() -> new ProductionConfigValidator(props("x", List.of(), false), "", "postgres", "postgres", "", " ", "http://inseguro"))
+        assertThatThrownBy(() -> new ProductionConfigValidator(props("x", List.of(), false), "", "postgres", "postgres", "", " ", " ", "curta-15-chars!", "http://inseguro"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("JWT_SECRET").hasMessageContaining("CORS_ALLOWED_ORIGINS").hasMessageContaining("DATABASE_URL")
                 .hasMessageContaining("DATABASE_USERNAME").hasMessageContaining("REDIS_PASSWORD").hasMessageContaining("secure-cookie")
-                .hasMessageContaining("MAIL_HOST").hasMessageContaining("PUBLIC_URL");
+                .hasMessageContaining("MAIL_HOST").hasMessageContaining("PUBLIC_URL").hasMessageContaining("RABBITMQ_PASSWORD")
+                .hasMessageContaining("RABBITMQ_USERNAME");
         assertThatThrownBy(() -> new ProductionConfigValidator(props(GOOD_SECRET, List.of("https://agendai.app"), true),
-                "jdbc:postgresql://db:5432/agendai", "agendai_app", "agendai_owner", "r3d1s-s3nha-al3atoria-0123", null, null))
-                .hasMessageContaining("MAIL_HOST").hasMessageContaining("PUBLIC_URL").hasMessageNotContaining("JWT_SECRET");
+                "jdbc:postgresql://db:5432/agendai", "agendai_app", "agendai_owner", "r3d1s-s3nha-al3atoria-0123", null, null, null, null))
+                .hasMessageContaining("MAIL_HOST").hasMessageContaining("PUBLIC_URL").hasMessageContaining("RABBITMQ_PASSWORD")
+                .hasMessageNotContaining("JWT_SECRET");
     }
 
     @Test

@@ -58,6 +58,31 @@ services:
       interval: 10s
       retries: 10
 
+  # eventos (ADR-003): o outbox publica aqui, o worker consome. Só na rede interna; mensagens e filas em disco.
+  rabbitmq:
+    logging: *logging
+    image: rabbitmq:4.1-alpine@sha256:146b4c1ceed64aa5ac1931f5bf1aac1b10ad0ac8193773410e0c1d15050f8ec7
+    restart: unless-stopped
+    hostname: rabbitmq            # o nome do nó fica estável entre recriações (os dados ficam no volume)
+    user: "100:101"               # usuário rabbitmq da imagem: sem passar pelo root do entrypoint
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-agendai}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?defina RABBITMQ_PASSWORD}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+      - ./rabbitmq/90-agendai.conf:/etc/rabbitmq/conf.d/90-agendai.conf:ro   # memória, WAL, disco
+    networks: [data]
+    mem_limit: ${RABBITMQ_MEM_LIMIT:-512m}
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+
   api:
     logging: *logging
     build: ../backend
@@ -66,6 +91,8 @@ services:
       db:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: prod
@@ -76,6 +103,9 @@ services:
       DATABASE_MIGRATION_PASSWORD: ${DATABASE_MIGRATION_PASSWORD:?}
       REDIS_HOST: redis
       REDIS_PASSWORD: ${REDIS_PASSWORD:?}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-agendai}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?}
       JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:?defina CORS_ALLOWED_ORIGINS}
       # SMTP do provedor (código de confirmação do agendamento): STARTTLS obrigatório por padrão
@@ -121,3 +151,4 @@ networks:
 
 volumes:
   db-data: {}
+  rabbitmq-data: {}

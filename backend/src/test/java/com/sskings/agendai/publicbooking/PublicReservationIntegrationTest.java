@@ -114,7 +114,7 @@ class PublicReservationIntegrationTest extends IntegrationTest {
         String token = body(pend).get("token").asString();
         assertThat(freeTimes(s)).as("o pendente já segura o horário").doesNotContain("09:00", "09:15", "09:30", "09:45");
 
-        String text = mail.lastTextTo(email);
+        String text = mail.awaitTextTo(email, "Seu código");
         assertThat(text).as("o nome digitado não vai no e-mail (remetente do Agendaí para endereço qualquer)").doesNotContain("Carla")
                 .contains("Corte com João").contains("segunda-feira, 30/11 às 09:15").contains("10 minutos");
         String code = mail.lastCodeTo(email);
@@ -131,6 +131,7 @@ class PublicReservationIntegrationTest extends IntegrationTest {
         MockHttpServletResponse again = confirm(s, token, code);
         assertThat(again.getStatus()).isEqualTo(200);
         assertThat(body(again)).as("clique duplo devolve o mesmo").isEqualTo(b);
+        assertThat(mail.awaitCountTo(email, "Agendamento confirmado", 1)).isEqualTo(1);
         String[] fromAndSubject = mail.lastFromAndSubjectTo(email);
         assertThat(fromAndSubject[0]).isEqualTo("nao-responda@agendai.app");
         assertThat(fromAndSubject[1]).as("o último é o aviso de confirmado").startsWith("Agendamento confirmado — Barbearia ");

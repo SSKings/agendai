@@ -17,6 +17,10 @@ spring:
     properties:
       mail.smtp.auth: false
       mail.smtp.starttls.required: false
+  rabbitmq:
+    port: 5673                   # RabbitMQ do compose.yaml (painel não incluso)
+    username: agendai
+    password: dev-rabbit-password
   data:
     redis:
       port: 6380

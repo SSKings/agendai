@@ -35,7 +35,6 @@ import java.util.UUID;
  * código por e-mail → confirmado. Tudo passa pelo guard público (link → estabelecimento no RLS, ADR-011).
  */
 @Component
-@lombok.extern.slf4j.Slf4j
 @RequiredArgsConstructor
 public class PublicBookingService {
 
@@ -49,6 +48,7 @@ public class PublicBookingService {
     private final TenantService tenants;
     private final java.time.Clock clock;
     private final SlotCache cache;
+    private final com.sskings.agendai.notification.Outbox outbox;
     @org.springframework.beans.factory.annotation.Value("${agendai.public-url}")
     private String publicUrl;
 
@@ -144,7 +144,7 @@ public class PublicBookingService {
                         %s
                         """.formatted(business.name(), c.view().serviceName(), c.view().professionalName(), WHEN.format(c.view().start()),
                         tenants.policyOf(business.id()).cancelUntilHours(), manageLink(slug, r.token())));
-                return new Outcome(c.view(), n, null);
+                return queued(business.id(), new Outcome(c.view(), n, null));
             } catch (ApiException e) {
                 return new Outcome(null, null, e);
             }
@@ -163,10 +163,10 @@ public class PublicBookingService {
         return finish(tx.execute(s -> {
             PublicBusiness business = access.enter(slug);
             BookingService.ClientBooking c = bookings.cancelByClient(business.id(), r.token(), tenants.policyOf(business.id()).cancelUntil());
-            return new Outcome(c.view(), new Notice(c.email(), "Agendamento cancelado — " + business.name(), """
+            return queued(business.id(), new Outcome(c.view(), new Notice(c.email(), "Agendamento cancelado — " + business.name(), """
                     Seu agendamento em %s foi cancelado: %s com %s, %s.
                     Se não foi você, fale com o estabelecimento.
-                    """.formatted(business.name(), c.view().serviceName(), c.view().professionalName(), WHEN.format(c.view().start()))), null);
+                    """.formatted(business.name(), c.view().serviceName(), c.view().professionalName(), WHEN.format(c.view().start()))), null));
         }));
     }
 
@@ -179,13 +179,13 @@ public class PublicBookingService {
             requireNotice(business.id(), h.start());
             BookingService.ClientBooking c = bookings.rescheduleByClient(business.id(), r.token(),
                     tenants.policyOf(business.id()).cancelUntil(), h.professionalId(), h.serviceId(), h.start());
-            return new Outcome(c.view(), new Notice(c.email(), "Agendamento remarcado — " + business.name(), """
+            return queued(business.id(), new Outcome(c.view(), new Notice(c.email(), "Agendamento remarcado — " + business.name(), """
                     Seu agendamento em %s foi remarcado: %s com %s, %s.
 
                     O seu link pessoal continua o mesmo:
                     %s
                     """.formatted(business.name(), c.view().serviceName(), c.view().professionalName(), WHEN.format(c.view().start()),
-                    manageLink(slug, r.token()))), null);
+                    manageLink(slug, r.token()))), null));
         }));
     }
 
@@ -204,18 +204,17 @@ public class PublicBookingService {
     }
 
     /**
-     * Depois do commit (a transação já devolveu a conexão): o erro guardado sobe; senão o aviso sai — e falhar aqui não
-     * desfaz nada (o cliente já viu o resultado; é "melhor esforço" até o outbox da fase 3, emenda ao ADR-003).
+     * Dentro da transação: o aviso vai para o outbox junto com o que o causou (ADR-003) — sai mesmo com o RabbitMQ ou o
+     * provedor de e-mail fora do ar agora, e nunca sai se a transação desfizer.
      */
-    private BookingService.PublicBookingView finish(Outcome o) {
+    private Outcome queued(UUID tenantId, Outcome o) {
+        if (o.notice() != null) outbox.email(tenantId, o.notice().to(), o.notice().subject(), o.notice().text());
+        return o;
+    }
+
+    /** Depois do commit: o erro guardado (tentativa errada do código, já gravada) sobe; senão, a resposta. */
+    private static BookingService.PublicBookingView finish(Outcome o) {
         if (o.error() != null) throw o.error();
-        if (o.notice() != null) {
-            try {
-                mailer.send(o.notice().to(), o.notice().subject(), o.notice().text());
-            } catch (RuntimeException e) {
-                log.warn("Aviso por e-mail não enviado ({})", o.notice().subject().substring(0, o.notice().subject().indexOf(" — ")));
-            }
-        }
         return o.view();
     }
 

@@ -39,7 +39,7 @@
 | `booking` | Agendamentos (criar, cancelar, atendido, falta; pela página: pendente → confirmado por código; pelo link pessoal: consultar, cancelar e remarcar até 3 vezes) e clientes (ADR-009); usa `catalog` (`offer`), `schedule` (`calendar`; implementa a porta `BusyPeriods`) e `tenant` (`TenantAccess`, `zoneOf`) — nenhum deles depende de `booking` (ArchUnit); os métodos da página e do link (`createPending`, `confirm`, `abandon`, `lookup`, `cancelByClient`, `rescheduleByClient`) só são chamados por `publicbooking`; LGPD (2d): exportar e anonimizar um cliente (só o dono, `CustomerPrivacy`) e a retenção (`CustomerRetention`, função `anonymize_stale_customers`, V9) |
 | `publicbooking` | Rotas públicas do cliente (sem login) em `/api/public/{link}`: leitura (2a), agendar (2b: reserva de 5 min no Redis — `Holds` —, pendente com código por e-mail, confirmação) e link pessoal (2c: consultar, cancelar, remarcar). Entra pelo guard `tenant.PublicAccess` (ADR-011); aplica a política do estabelecimento (`TenantService.policyOf`) por cima das regras do painel. Horários livres da página em cache no Redis (`SlotCache`, ADR-012); a reserva lê o banco |
 | `waitlist` | Lista de espera e oferta de vaga |
-| `notification` | Envio de e-mail (`Mailer`; SMTP do provedor, Mailpit em dev/teste/CI), sempre fora da transação do banco: o código de confirmação (falhou → o pendente expira e 503) e os avisos ao cliente (melhor esforço, depois do commit). Na fase 3 vira outbox + worker (ADR-003 e emendas) |
+| `notification` | E-mail (`Mailer`; SMTP do provedor, Mailpit em dev/teste/CI). O código de confirmação sai síncrono, fora da transação (falhou → o pendente expira e 503). Os avisos ao cliente vão pelo outbox (3a): `Outbox` grava na transação de quem os causou, `OutboxPublisher` publica no RabbitMQ com confirmação, `EmailWorker` envia de forma idempotente, com novas tentativas e fila de falhas (ADR-003 e emendas) |
 | `auth`, `security` | Login da equipe, tokens, limites, cabeçalhos |
 | `db`, `config`, `common` | Infraestrutura: variáveis do RLS na transação, configuração e validação de produção, erros padronizados. `DbSession.enterTenant` avisa (`TenantDataChanged`) depois do commit de toda escrita num estabelecimento |
 | `reporting` | Indicadores do painel |
@@ -89,12 +89,22 @@ Teste obrigatório: 100 requisições simultâneas para o mesmo horário → exa
 
 ## Eventos: padrão outbox
 
-1. Na **mesma transação** do agendamento, grava-se um registro em `outbox_events` (ex.: `BookingConfirmed`).
+Implementado na fase 3a (`notification`: `Outbox`, `OutboxPublisher`, `EmailWorker`, `Messaging`; V10):
+
+1. Na **mesma transação** do agendamento, grava-se um registro em `outbox_events` (hoje o tipo `notification.email`,
+   com destino, assunto e texto prontos; o conteúdo sai do banco quando é publicado).
 2. Um publicador lê o outbox (`FOR UPDATE SKIP LOCKED`, seguro com várias instâncias) e publica no RabbitMQ com
    *publisher confirms*; só marca como publicado depois da confirmação.
-3. O worker consome com *ack* manual, registra o id do evento em `processed_events` (idempotência: evento repetido
-   não manda e-mail duas vezes) e, em falha, tenta de novo com espera crescente; esgotadas as tentativas, a mensagem
-   vai para a fila de falhas (*dead-letter*) e gera alerta.
+3. O worker consome (o *ack* só sai quando o processamento termina sem erro), registra o id do evento em
+   `processed_events` na mesma transação do envio (idempotência: evento repetido não manda e-mail duas vezes). Em
+   falha, encaminha a mensagem (com confirmação do broker) para `agendai.notifications.email.wait`, que a devolve à
+   fila depois de 1 min; depois de 180 tentativas, ou se a mensagem não tem conserto, vai para a fila de falhas
+   (`agendai.notifications.email.dlq`, 7 dias). Tipos sem fila caem em `agendai.unrouted` (exchange alternativo).
+   Filas *quorum*. O alerta da fila de falhas e o worker como processo separado vêm na 3b; na 3a o consumidor roda na
+   própria API (`agendai.worker.enabled`).
+4. O RabbitMQ fora do ar não derruba a API: o health dele fica fora do health da API, e os avisos esperam no outbox.
+   O publicador usa uma conexão própria (broker bloqueando publicações não para os consumidores), e os jobs agendados
+   têm 3 threads (outbox, expiração de pendentes e retenção não esperam uns pelos outros).
 
 Garantia: um agendamento confirmado **sempre** gera seus avisos, mesmo que o RabbitMQ esteja fora no momento (ADR-003).
 

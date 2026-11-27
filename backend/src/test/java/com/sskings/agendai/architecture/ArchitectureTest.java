@@ -102,4 +102,16 @@ class ArchitectureTest {
                 .should().onlyBeAccessed().byClassesThat().resideInAnyPackage("..user..", "..auth..", "..security..", "..config..")
                 .check(APP);
     }
+
+    @Test
+    @DisplayName("RabbitMQ só pelo módulo de notificação: os outros mandam eventos pelo outbox, na transação (ADR-003)")
+    void messagingOnlyThroughOutbox() {
+        noClasses().that().resideOutsideOfPackages("..notification..")
+                .should().dependOnClassesThat().resideInAPackage("org.springframework.amqp..")
+                .check(APP);
+        noClasses().that().resideInAPackage("..notification..")
+                .should().dependOnClassesThat().resideInAnyPackage("..booking..", "..publicbooking..", "..catalog..", "..schedule..")
+                .check(APP);
+    }
 }
+

@@ -141,7 +141,7 @@ class ManageLinkIntegrationTest extends IntegrationTest {
         Shop s = shop();
         String email = email();
         String token = confirmed(s, "09:00", email);
-        String text = mail.lastTextTo(email);
+        String text = mail.awaitTextTo(email, "Agendamento confirmado");
         assertThat(text).contains("confirmado").contains("http://localhost:5173/agendar/" + s.slug() + "/gerenciar#" + token)
                 .contains("até 24 h antes");
 
@@ -154,7 +154,7 @@ class ManageLinkIntegrationTest extends IntegrationTest {
 
         JsonNode cancelled = body(action(s, "cancel", Map.of("token", token)));
         assertThat(cancelled.get("status").asString()).isEqualTo("CANCELLED");
-        assertThat(mail.lastTextTo(email)).contains("cancelado");
+        assertThat(mail.awaitTextTo(email, "Agendamento cancelado")).contains("cancelado");
         JsonNode after = body(action(s, "lookup", Map.of("token", token)));
         assertThat(after.get("booking").get("status").asString()).isEqualTo("CANCELLED");
         assertThat(after.get("changeable").asBoolean()).isFalse();
@@ -192,7 +192,7 @@ class ManageLinkIntegrationTest extends IntegrationTest {
         assertThat(body(r).get("status").asString()).isEqualTo("CONFIRMED");
         assertThat(body(action(s, "lookup", Map.of("token", token))).get("booking").get("start").asString())
                 .isEqualTo(MONDAY + "T10:30:00-03:00");
-        assertThat(mail.lastTextTo(email)).contains("remarcado").contains("#" + token);
+        assertThat(mail.awaitTextTo(email, "Agendamento remarcado")).contains("remarcado").contains("#" + token);
         JsonNode agenda = body(call(get(s.base() + "/bookings").param("from", MONDAY).param("to", MONDAY), s.owner().token(), null));
         assertThat(agenda.get("bookings").findValuesAsString("status")).containsExactlyInAnyOrder("CONFIRMED", "CANCELLED");
         assertThat(agenda.get("bookings").findValuesAsString("name")).containsOnly("Carla Dias");
@@ -235,7 +235,7 @@ class ManageLinkIntegrationTest extends IntegrationTest {
     @Autowired org.testcontainers.containers.GenericContainer<?> mailpit;
 
     @Test
-    @DisplayName("Aviso que não sai depois de gravado não desfaz nada: cancelar responde 200 e fica cancelado")
+    @DisplayName("Provedor de e-mail fora: cancelar responde 200 e fica cancelado; o aviso chega quando ele volta (outbox)")
     void noticeFailureKeepsResult() throws Exception {
         Shop s = shop();
         String email = email();
@@ -245,11 +245,12 @@ class ManageLinkIntegrationTest extends IntegrationTest {
         try {
             MockHttpServletResponse r = action(s, "cancel", Map.of("token", token));
             assertThat(r.getStatus()).as(r.getContentAsString()).isEqualTo(200);
+            Thread.sleep(7000);      // mais que uma tentativa (timeout do SMTP 5 s): o aviso passa pela fila de espera
         } finally {
             docker.unpauseContainerCmd(mailpit.getContainerId()).exec();
         }
         assertThat(body(action(s, "lookup", Map.of("token", token))).get("booking").get("status").asString()).isEqualTo("CANCELLED");
-        assertThat(mail.countTo(email, "Agendamento cancelado")).isZero();
+        assertThat(mail.awaitCountTo(email, "Agendamento cancelado", 1)).isEqualTo(1);
     }
 
     @Test
@@ -259,6 +260,8 @@ class ManageLinkIntegrationTest extends IntegrationTest {
         String email = email();
         String token = confirmed(s, "09:00", email);
         assertThat(action(s, "confirm", Map.of("token", token, "code", "000000")).getStatus()).isEqualTo(200);
+        assertThat(mail.awaitCountTo(email, "Agendamento confirmado", 1)).isEqualTo(1);
+        Thread.sleep(1500);      // tempo para um segundo aviso, se houvesse, passar pelo outbox e pelo worker
         assertThat(mail.countTo(email, "Agendamento confirmado")).isEqualTo(1);
 
         String other = email();

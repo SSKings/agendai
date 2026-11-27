@@ -48,6 +48,27 @@ spring:
       mail.smtp.connectiontimeout: 3000     # provedor lento não segura a requisição do cliente
       mail.smtp.timeout: 5000
       mail.smtp.writetimeout: 5000
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:}
+    password: ${RABBITMQ_PASSWORD:}
+    connection-timeout: 3s
+    # o publicador do outbox espera a confirmação do broker antes de marcar o evento como publicado (ADR-003)
+    publisher-confirm-type: simple
+    listener:
+      simple:
+        concurrency: 2
+        prefetch: 10
+        # as novas tentativas são do worker (fila de espera, sem dormir no thread); exceção que escapa dele é falha do
+        # próprio broker ao encaminhar: a mensagem volta para a fila
+        default-requeue-rejected: true
+        retry:
+          enabled: false
+  task:
+    scheduling:
+      pool:
+        size: 3                  # outbox, expiração de pendentes e retenção não esperam uns pelos outros
   data:
     redis:
       host: ${REDIS_HOST:localhost}
@@ -79,6 +100,10 @@ management:
       show-details: never
       probes:
         enabled: false
+  health:
+    # o RabbitMQ fora do ar não derruba a API: os avisos esperam no outbox (ADR-003)
+    rabbit:
+      enabled: false
 
 springdoc:
   api-docs:
@@ -104,6 +129,12 @@ agendai:
     from: ${MAIL_FROM:Agendaí <nao-responda@agendai.app>}
   # endereço do front para os links nos e-mails (link pessoal do cliente); em produção, só https
   public-url: ${PUBLIC_URL:http://localhost:5173}
+  outbox:
+    publish-every: ${OUTBOX_PUBLISH_EVERY:PT1S}   # evento → e-mail < 30 s (roadmap); 1 s de folga
+  worker:
+    enabled: ${WORKER_ENABLED:true}   # consome as filas (o worker separado vem na 3b)
+    retry-delay: PT1M            # espera entre as tentativas de um e-mail (fila de espera no broker)
+    max-attempts: 180            # 3 h de provedor fora sem perder aviso; depois, fila de falhas
   max-request-bytes: 65536       # a API só recebe JSON pequeno
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:}

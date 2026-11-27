@@ -34,6 +34,18 @@ para o outbox.
 remarcado) saem depois do commit, fora da transação, e são "melhor esforço": se o provedor falhar, o resultado já
 gravado vale e o aviso se perde (fica no log). O link pessoal também aparece na tela da confirmação. A garantia "pelo
 menos uma vez" deste ADR chega com o outbox da fase 3.
+**Emenda (fase 3a):** os avisos ao cliente (confirmado, cancelado, remarcado) vão para o `outbox_events` na mesma
+transação; o publicador (`OutboxPublisher`, a cada 1 s, `SKIP LOCKED` pela função `outbox_claim`) publica com
+confirmação do broker e só então marca como publicado — e apaga o conteúdo (e-mail, texto com o link pessoal) do
+banco. O worker (`EmailWorker`) é idempotente pelo id do evento (`processed_events`, na transação do envio). Falha de
+envio (provedor fora) não dorme no thread nem se perde: a mensagem vai para uma fila de espera, que a devolve depois de
+1 min, até 180 tentativas (3 h de provedor fora sem perder aviso); esgotadas, ou mensagem sem conserto (malformada),
+vai para a fila de falhas (7 dias). O que o broker não consegue rotear (tipo sem fila) fica numa fila própria pelo
+exchange alternativo, não some depois da confirmação. Os tipos de evento são versionados (`notification.email.v1`).
+Ainda pode haver e-mail repetido num caso raro: o provedor aceitou e a transação do worker caiu antes do commit
+("pelo menos uma vez"). O **código de confirmação continua síncrono**, por decisão: é parte da interação (o
+cliente espera por ele na tela, e a falha vira 503 com o pendente expirado — emenda da 2b), e gravá-lo em claro no
+outbox poria um segredo de 10 minutos no banco e no broker.
 
 ## ADR-004 — TDD e 100% de cobertura exigidos pelo CI
 

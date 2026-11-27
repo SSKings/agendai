@@ -71,6 +71,11 @@ agendamento não funciona; nenhum dado de outro cliente aparece. **Desempenho:**
 
 ## Fase 3 — Eventos e notificações
 
+Em PRs: **3a** RabbitMQ, outbox, publicador com confirmação e consumidor idempotente com novas tentativas e fila de
+falhas (os avisos ao cliente deixam de ser "melhor esforço"); **3b** worker como processo separado, usuários do
+RabbitMQ separados (publicar × consumir), métricas e alerta (outbox parado, fila de falhas, não roteados), reenvio da
+fila de falhas e limpeza de `outbox_events`/`processed_events` (com trava distribuída); **3c** lembretes 24 h e 2 h antes; **3d** WhatsApp (canal opcional).
+
 - Outbox na transação do agendamento; publicador com `SKIP LOCKED` e *publisher confirms*.
 - Worker de notificações separado: e-mail, idempotência, novas tentativas, fila de falhas, alerta.
 - Lembretes 24 h e 2 h antes, com job de trava distribuída; WhatsApp (API oficial) como canal opcional.

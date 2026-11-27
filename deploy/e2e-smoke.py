@@ -200,7 +200,8 @@ def main():
         check("o agendamento online aparece na agenda do dono", any(b["customer"]["name"] == "Cliente Online"
               and b["status"] == "CONFIRMED" for b in ag["bookings"]), ag)
         # ---- link pessoal (fase 2c): o e-mail de confirmação traz o link; consultar e cancelar sem login ----
-        link_mail = mailpit_text(mailpit, to, "confirmado")
+        # pelo assunto: o aviso sai pelo outbox (assíncrono), e o e-mail do código também diz "confirmado"
+        link_mail = mailpit_text(mailpit, to, 'subject:"Agendamento confirmado"')
         check("e-mail de confirmação com o link pessoal (token no fragmento)",
               link_mail is not None and f"/agendar/{tenant['slug']}/gerenciar#{pend['token']}" in link_mail)
         s, mine, _ = call("POST", pub + "/bookings/lookup", body={"token": pend["token"]})

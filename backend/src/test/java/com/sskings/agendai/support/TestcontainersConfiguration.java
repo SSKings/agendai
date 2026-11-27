@@ -21,6 +21,9 @@ public class TestcontainersConfiguration {
     static final String REDIS_IMAGE =
             "redis:7.4-alpine@sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe";
     static final String REDIS_PASSWORD = "redis-test-password";
+    static final String RABBITMQ_IMAGE =
+            "rabbitmq:4.1-alpine@sha256:146b4c1ceed64aa5ac1931f5bf1aac1b10ad0ac8193773410e0c1d15050f8ec7";
+    static final String RABBITMQ_PASSWORD = "rabbit-test-password";
     static final String MAILPIT_IMAGE =
             "axllent/mailpit:v1.27@sha256:e22dce5b36f93c77082e204a3942fb6b283b7896e057458400a4c88344c3df68";
 
@@ -38,6 +41,17 @@ public class TestcontainersConfiguration {
                 .withCommand("redis-server", "--requirepass", REDIS_PASSWORD);
     }
 
+    /** Broker dos eventos (outbox → worker), com usuário próprio como na produção (o "guest" só vale em localhost). */
+    @Bean(initMethod = "start", destroyMethod = "stop")
+    GenericContainer<?> rabbitmq() {
+        return new GenericContainer<>(DockerImageName.parse(RABBITMQ_IMAGE))
+                .withExposedPorts(5672)
+                .withEnv("RABBITMQ_DEFAULT_USER", "agendai")
+                .withEnv("RABBITMQ_DEFAULT_PASS", RABBITMQ_PASSWORD)
+                .waitingFor(org.testcontainers.containers.wait.strategy.Wait.forLogMessage(".*Server startup complete.*", 1)
+                        .withStartupTimeout(java.time.Duration.ofMinutes(2)));
+    }
+
     /** SMTP de teste: guarda os e-mails e os mostra por uma API HTTP (MailBox lê o código de confirmação). */
     @Bean(initMethod = "start", destroyMethod = "stop")
     GenericContainer<?> mailpit() {
@@ -50,7 +64,8 @@ public class TestcontainersConfiguration {
     }
 
     @Bean
-    DynamicPropertyRegistrar containers(PostgreSQLContainer postgres, GenericContainer<?> redis, GenericContainer<?> mailpit) {
+    DynamicPropertyRegistrar containers(PostgreSQLContainer postgres, GenericContainer<?> redis, GenericContainer<?> mailpit,
+                                        GenericContainer<?> rabbitmq) {
         return r -> {
             r.add("spring.datasource.url", postgres::getJdbcUrl);
             r.add("spring.datasource.username", () -> "agendai_app");
@@ -60,6 +75,10 @@ public class TestcontainersConfiguration {
             r.add("spring.data.redis.host", redis::getHost);
             r.add("spring.data.redis.port", () -> redis.getMappedPort(6379));
             r.add("spring.data.redis.password", () -> REDIS_PASSWORD);
+            r.add("spring.rabbitmq.host", rabbitmq::getHost);
+            r.add("spring.rabbitmq.port", () -> rabbitmq.getMappedPort(5672));
+            r.add("spring.rabbitmq.username", () -> "agendai");
+            r.add("spring.rabbitmq.password", () -> RABBITMQ_PASSWORD);
             r.add("spring.mail.host", mailpit::getHost);
             r.add("spring.mail.port", () -> mailpit.getMappedPort(1025));
             r.add("spring.mail.properties.mail.smtp.auth", () -> "false");

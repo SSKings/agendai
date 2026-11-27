@@ -42,13 +42,14 @@ http://localhost:8025 (sobe junto com o compose.yaml).
 
 Documentação interativa da API (só em dev): http://localhost:8080/swagger-ui.html
 
-Pilha de produção (nginx com TLS, API, PostgreSQL, Redis), como o CI sobe: veja o cabeçalho de
+Pilha de produção (nginx com TLS, backend em três papéis — migrate, API e worker —, PostgreSQL, Redis, RabbitMQ), como o CI sobe: veja o cabeçalho de
 [deploy/docker-compose.prod.yml](deploy/docker-compose.prod.yml) e o teste ponta a ponta
 [deploy/e2e-smoke.py](deploy/e2e-smoke.py).
 
 **Atualizando um banco que já existe** (produção ou o volume de dev): o PostgreSQL só roda `deploy/db-init` com o
 volume vazio, e algumas migrações dependem do que esses scripts criam (papéis, extensões como `btree_gist`). Antes de
-subir a API nova, rode-os de novo — são idempotentes, e é o que o CI faz no teste de upgrade:
+subir a versão nova (o serviço `migrate` aplica as migrações), rode-os de novo — são idempotentes, e é o que o CI faz
+no teste de upgrade:
 
 ```bash
 docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env.prod up -d --wait db

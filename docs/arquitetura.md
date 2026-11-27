@@ -100,13 +100,33 @@ Implementado na fase 3a (`notification`: `Outbox`, `OutboxPublisher`, `EmailWork
    falha, encaminha a mensagem (com confirmação do broker) para `agendai.notifications.email.wait`, que a devolve à
    fila depois de 1 min; depois de 180 tentativas, ou se a mensagem não tem conserto, vai para a fila de falhas
    (`agendai.notifications.email.dlq`, 7 dias). Tipos sem fila caem em `agendai.unrouted` (exchange alternativo).
-   Filas *quorum*. O alerta da fila de falhas e o worker como processo separado vêm na 3b; na 3a o consumidor roda na
-   própria API (`agendai.worker.enabled`).
-4. O RabbitMQ fora do ar não derruba a API: o health dele fica fora do health da API, e os avisos esperam no outbox.
-   O publicador usa uma conexão própria (broker bloqueando publicações não para os consumidores), e os jobs agendados
+   Filas *quorum*.
+4. O RabbitMQ fora do ar não derruba a API (ela nem conecta nele, 3b1): os avisos esperam no outbox. No worker, o
+   publicador usa uma conexão própria (broker bloqueando publicações não para os consumidores), e os jobs agendados
    têm 3 threads (outbox, expiração de pendentes e retenção não esperam uns pelos outros).
 
 Garantia: um agendamento confirmado **sempre** gera seus avisos, mesmo que o RabbitMQ esteja fora no momento (ADR-003).
+
+### Processos (fase 3b1)
+
+A mesma imagem roda em três papéis (perfis do Spring; em dev e nos testes, sem perfil de papel, um processo faz tudo):
+
+| Papel | Faz | Não faz |
+|---|---|---|
+| `migrate` | aplica as migrações (Flyway, dono das tabelas) e sai | HTTP, RabbitMQ, componentes de fundo |
+| `api` | HTTP (atrás do nginx); grava o outbox na transação | falar com o RabbitMQ (autoconfiguração excluída), jobs, migrar |
+| `worker` | publica o outbox, consome as filas, declara a topologia, jobs (expiração de pendentes, retenção) | HTTP da API (`server.port=-1`; health na 8081 só no localhost), migrar |
+
+Cada componente de fundo liga por propriedade (`agendai.outbox.enabled`, `agendai.worker.enabled`,
+`agendai.jobs.enabled`), e os perfis (`application-{migrate,api,worker}.yml`) só as combinam. Ordem de subida: banco
+→ `migrate` → API e worker (cada um sem esperar o outro); o broker → `rabbitmq-init` → worker. Como o worker declara a
+topologia na mesma conexão em que publica, o primeiro evento nunca encontra o exchange faltando. Várias instâncias de
+API e de worker podem rodar juntas (outbox com `SKIP LOCKED`, jobs idempotentes; prefetch 2 para uma réplica lenta não
+segurar e-mails que outra mandaria).
+
+Conexões com o banco: `réplicas_api × 20 + réplicas_worker × 5 + 2 (migrate) + folga < max_connections` (100 no
+padrão do PostgreSQL). Com mais réplicas, baixar `DATABASE_POOL_SIZE` da API. O pool do worker cobre 2 consumidores
+(que seguram a transação durante o envio SMTP), o outbox e os 2 jobs: subir a `concurrency` exige subir o pool.
 
 Lembretes (24 h e 2 h antes): agendados no banco; um job com trava distribuída (`SKIP LOCKED`) cria os eventos na hora
 certa — sem `@Scheduled` que rodaria em todas as instâncias ao mesmo tempo.

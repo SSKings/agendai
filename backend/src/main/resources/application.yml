@@ -59,7 +59,7 @@ spring:
     listener:
       simple:
         concurrency: 2
-        prefetch: 10
+        prefetch: 2              # envio lento (SMTP): com várias réplicas, uma não segura e-mails que outra, livre, mandaria
         # as novas tentativas são do worker (fila de espera, sem dormir no thread); exceção que escapa dele é falha do
         # próprio broker ao encaminhar: a mensagem volta para a fila
         default-requeue-rejected: true
@@ -68,7 +68,7 @@ spring:
   task:
     scheduling:
       pool:
-        size: 3                  # outbox, expiração de pendentes e retenção não esperam uns pelos outros
+        size: 3                  # no worker: outbox, expiração de pendentes e retenção não esperam uns pelos outros
   data:
     redis:
       host: ${REDIS_HOST:localhost}
@@ -129,10 +129,14 @@ agendai:
     from: ${MAIL_FROM:Agendaí <nao-responda@agendai.app>}
   # endereço do front para os links nos e-mails (link pessoal do cliente); em produção, só https
   public-url: ${PUBLIC_URL:http://localhost:5173}
+  # Papéis (produção: perfis migrate, api e worker, ADR-003). Sem perfil de papel (dev, testes), um processo faz tudo.
   outbox:
+    enabled: true                # publica o outbox no RabbitMQ (papel worker)
     publish-every: ${OUTBOX_PUBLISH_EVERY:PT1S}   # evento → e-mail < 30 s (roadmap); 1 s de folga
+  jobs:
+    enabled: true                # expiração de pendentes e retenção (papel worker)
   worker:
-    enabled: ${WORKER_ENABLED:true}   # consome as filas (o worker separado vem na 3b)
+    enabled: true                # consome as filas (papel worker)
     retry-delay: PT1M            # espera entre as tentativas de um e-mail (fila de espera no broker)
     max-attempts: 180            # 3 h de provedor fora sem perder aviso; depois, fila de falhas
   max-request-bytes: 65536       # a API só recebe JSON pequeno

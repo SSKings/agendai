@@ -1,4 +1,5 @@
-# Pilha de produção do Agendaí: PostgreSQL + Redis + API (perfil prod) + nginx (TLS, front-end e proxy de /api).
+# Pilha de produção do Agendaí: PostgreSQL + Redis + RabbitMQ + backend em três papéis (a mesma imagem: migrate roda e
+# sai; api atende o HTTP; worker publica o outbox e consome as filas) + nginx (TLS, front-end e proxy de /api).
 # Uso:  cp .env.prod.example .env.prod  → preencha  →  coloque fullchain.pem e privkey.pem em ./certs
 #       docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
 #
@@ -65,9 +66,8 @@ services:
     restart: unless-stopped
     hostname: rabbitmq            # o nome do nó fica estável entre recriações (os dados ficam no volume)
     user: "100:101"               # usuário rabbitmq da imagem: sem passar pelo root do entrypoint
-    environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-agendai}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?defina RABBITMQ_PASSWORD}
+    # sem usuário administrador: os da aplicação vêm do rabbitmq-init (o guest da imagem só entra pelo localhost do
+    # próprio container, e o init o apaga)
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
       - ./rabbitmq/90-agendai.conf:/etc/rabbitmq/conf.d/90-agendai.conf:ro   # memória, WAL, disco
@@ -83,29 +83,74 @@ services:
       timeout: 10s
       retries: 12
 
-  api:
+  # Usuário do RabbitMQ do worker, com o mínimo de permissão (rabbitmq/init-users.sh). Roda a cada `up`: trocar a senha
+  # no .env.prod e subir de novo troca no broker. Fala com o nó pelo cookie do Erlang (volume, só leitura).
+  rabbitmq-init:
+    logging: *logging
+    image: rabbitmq:4.1-alpine@sha256:146b4c1ceed64aa5ac1931f5bf1aac1b10ad0ac8193773410e0c1d15050f8ec7
+    restart: "no"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    user: "100:101"
+    entrypoint: ["sh", "/init-users.sh"]
+    environment:
+      HOME: /var/lib/rabbitmq       # onde o rabbitmqctl acha o cookie
+      RABBITMQ_WORKER_PASSWORD: ${RABBITMQ_WORKER_PASSWORD:?defina RABBITMQ_WORKER_PASSWORD}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq:ro
+      - ./rabbitmq/init-users.sh:/init-users.sh:ro
+    networks: [data]
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+
+  # Papel migrate: aplica as migrações com o dono das tabelas e sai. Só ele recebe essa senha; a API e o worker sobem
+  # depois dele e não dependem um do outro.
+  migrate:
     logging: *logging
     build: ../backend
-    restart: unless-stopped
+    image: agendai-backend:local    # a mesma imagem serve os três papéis
+    restart: "no"
     depends_on:
       db:
         condition: service_healthy
-      redis:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
     environment:
-      SPRING_PROFILES_ACTIVE: prod
+      SPRING_PROFILES_ACTIVE: prod,migrate
       DATABASE_URL: jdbc:postgresql://db:5432/${DATABASE_NAME:-agendai}
       DATABASE_USERNAME: ${DATABASE_USERNAME:?}
       DATABASE_PASSWORD: ${DATABASE_PASSWORD:?}
+      DATABASE_POOL_SIZE: 2
       DATABASE_MIGRATION_USERNAME: ${DATABASE_MIGRATION_USERNAME:?}
       DATABASE_MIGRATION_PASSWORD: ${DATABASE_MIGRATION_PASSWORD:?}
+    healthcheck:
+      disable: true                 # roda e sai
+    networks: [data]
+    mem_limit: ${MIGRATE_MEM_LIMIT:-512m}
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+
+  # Papel api: atende o HTTP (atrás do nginx). Não fala com o RabbitMQ (o outbox é só uma tabela) nem migra o banco.
+  api:
+    logging: *logging
+    build: ../backend
+    image: agendai-backend:local
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod,api
+      DATABASE_URL: jdbc:postgresql://db:5432/${DATABASE_NAME:-agendai}
+      DATABASE_USERNAME: ${DATABASE_USERNAME:?}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:?}
       REDIS_HOST: redis
       REDIS_PASSWORD: ${REDIS_PASSWORD:?}
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-agendai}
-      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?}
       JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:?defina CORS_ALLOWED_ORIGINS}
       # SMTP do provedor (código de confirmação do agendamento): STARTTLS obrigatório por padrão
@@ -117,12 +162,64 @@ services:
       MAIL_FROM: ${MAIL_FROM:-Agendaí <nao-responda@agendai.app>}
       MAIL_AUTH: ${MAIL_AUTH:-true}
       MAIL_STARTTLS_REQUIRED: ${MAIL_STARTTLS_REQUIRED:-true}
-    networks: [edge, data]          # edge: sai para o SMTP do provedor
+    networks: [edge, data]          # edge: o nginx a alcança, e ela sai para o SMTP do provedor
     mem_limit: ${API_MEM_LIMIT:-768m}
+    healthcheck:                    # o mesmo da imagem, mas checando a cada 2 s enquanto sobe
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/actuator/health >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      start_interval: 2s
+      retries: 3
     read_only: true
     tmpfs: [/tmp]
     security_opt: ["no-new-privileges:true"]
     cap_drop: [ALL]
+
+  # Papel worker: publica o outbox, consome as filas (e-mails), declara a topologia no RabbitMQ e roda os jobs de
+  # manutenção. Sem porta da API; o health fica no localhost do container (só o healthcheck o vê). Não recebe JWT, Redis
+  # nem o dono das tabelas. Escala com --scale worker=N (outbox com SKIP LOCKED, jobs idempotentes).
+  worker:
+    logging: *logging
+    build: ../backend
+    image: agendai-backend:local
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      rabbitmq-init:
+        condition: service_completed_successfully
+    environment:
+      SPRING_PROFILES_ACTIVE: prod,worker
+      # heap menor que o da API: o resto do container é metaspace, code cache e pilhas das threads
+      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=60 -XX:MaxMetaspaceSize=160m -XX:+ExitOnOutOfMemoryError
+      DATABASE_URL: jdbc:postgresql://db:5432/${DATABASE_NAME:-agendai}
+      DATABASE_USERNAME: ${DATABASE_USERNAME:?}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:?}
+      DATABASE_POOL_SIZE: ${WORKER_DATABASE_POOL_SIZE:-5}   # 2 consumidores + outbox + 2 jobs
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USERNAME: agendai_worker
+      RABBITMQ_PASSWORD: ${RABBITMQ_WORKER_PASSWORD:?}
+      MAIL_HOST: ${MAIL_HOST:?defina MAIL_HOST}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-Agendaí <nao-responda@agendai.app>}
+      MAIL_AUTH: ${MAIL_AUTH:-true}
+      MAIL_STARTTLS_REQUIRED: ${MAIL_STARTTLS_REQUIRED:-true}
+    networks: [egress, data]        # egress: só a saída para o SMTP (o nginx, no edge, não o alcança)
+    mem_limit: ${WORKER_MEM_LIMIT:-512m}
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8081/actuator/health >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      start_interval: 2s
+      retries: 3
 
   web:
     logging: *logging
@@ -146,6 +243,7 @@ services:
 
 networks:
   edge: {}
+  egress: {}          # só saída (SMTP do worker): sem o nginx
   data:
     internal: true
 

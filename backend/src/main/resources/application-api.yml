@@ -1,0 +1,15 @@
+# Papel "api" (produção: SPRING_PROFILES_ACTIVE=prod,api): só atende o HTTP (atrás do nginx). Não fala com o RabbitMQ
+# (nem conexão, nem credencial: o outbox é só uma tabela; quem publica é o worker), não roda os jobs e não migra o banco
+# (o serviço migrate migra antes; a API nem recebe a senha do dono das tabelas).
+spring:
+  autoconfigure:
+    exclude: org.springframework.boot.rabbitmq.autoconfigure.RabbitAutoConfiguration
+  flyway:
+    enabled: false
+agendai:
+  outbox:
+    enabled: false
+  worker:
+    enabled: false
+  jobs:
+    enabled: false

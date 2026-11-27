@@ -1,0 +1,22 @@
+# Papel "worker" (produção: SPRING_PROFILES_ACTIVE=prod,worker): publica o outbox, consome as filas, declara a topologia
+# no RabbitMQ e roda os jobs de manutenção. Não atende a API (server.port -1: sem porta HTTP); só o health, no
+# localhost do container (o healthcheck do Docker). Não migra o banco e não recebe JWT, Redis nem o dono das tabelas.
+spring:
+  flyway:
+    enabled: false
+server:
+  port: -1
+management:
+  server:
+    port: 8081
+    address: 127.0.0.1
+  health:
+    rabbit:
+      enabled: true              # sem o broker o worker não faz nada: aparece como unhealthy
+    redis:
+      enabled: false             # o worker não usa o Redis (nem recebe a senha dele)
+    mail:
+      enabled: false             # SMTP fora não é defeito do worker (ele tenta de novo) e não abre conexão a cada 30 s
+agendai:
+  jwt:
+    required: false

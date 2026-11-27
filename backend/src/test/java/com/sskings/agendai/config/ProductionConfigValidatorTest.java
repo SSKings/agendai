@@ -3,6 +3,8 @@ package com.sskings.agendai.config;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import org.springframework.mock.env.MockEnvironment;
+
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -78,7 +80,7 @@ class ProductionConfigValidatorTest {
     @Test
     @DisplayName("Configuração correta: a aplicação sobe")
     void validConfigStarts() {
-        new ProductionConfigValidator(props(GOOD_SECRET, List.of("https://agendai.app"), true),
+        new ProductionConfigValidator(role("api"), props(GOOD_SECRET, List.of("https://agendai.app"), true),
                 "jdbc:postgresql://db:5432/agendai", "agendai_app", "agendai_owner", "r3d1s-s3nha-al3atoria-0123", "smtp.provedor.com",
                 "agendai", "r4bb1t-s3nha-al3atoria-01", "https://agendai.app");
     }
@@ -86,16 +88,17 @@ class ProductionConfigValidatorTest {
     @Test
     @DisplayName("Com problema, a aplicação não sobe e a mensagem lista todos")
     void failsFast() {
-        assertThatThrownBy(() -> new ProductionConfigValidator(props("x", List.of(), false), "", "postgres", "postgres", "", " ", " ", "curta-15-chars!", "http://inseguro"))
-                .isInstanceOf(IllegalStateException.class)
+        assertThatThrownBy(() -> new ProductionConfigValidator(role("prod"), props("x", List.of(), false), "", "postgres", "postgres", "", " ", " ", "curta-15-chars!", "http://inseguro"))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("SPRING_PROFILES_ACTIVE")
                 .hasMessageContaining("JWT_SECRET").hasMessageContaining("CORS_ALLOWED_ORIGINS").hasMessageContaining("DATABASE_URL")
                 .hasMessageContaining("DATABASE_USERNAME").hasMessageContaining("REDIS_PASSWORD").hasMessageContaining("secure-cookie")
                 .hasMessageContaining("MAIL_HOST").hasMessageContaining("PUBLIC_URL").hasMessageContaining("RABBITMQ_PASSWORD")
                 .hasMessageContaining("RABBITMQ_USERNAME");
-        assertThatThrownBy(() -> new ProductionConfigValidator(props(GOOD_SECRET, List.of("https://agendai.app"), true),
-                "jdbc:postgresql://db:5432/agendai", "agendai_app", "agendai_owner", "r3d1s-s3nha-al3atoria-0123", null, null, null, null))
-                .hasMessageContaining("MAIL_HOST").hasMessageContaining("PUBLIC_URL").hasMessageContaining("RABBITMQ_PASSWORD")
-                .hasMessageNotContaining("JWT_SECRET");
+        assertThatThrownBy(() -> new ProductionConfigValidator(role("prod", "api"), props(GOOD_SECRET, List.of("https://agendai.app"), true),
+                "jdbc:postgresql://db:5432/agendai", "agendai_app", null, "r3d1s-s3nha-al3atoria-0123", null, null, null, null))
+                .as("a API não fala com o RabbitMQ nem migra")
+                .hasMessageContaining("MAIL_HOST").hasMessageContaining("PUBLIC_URL")
+                .hasMessageNotContaining("RABBITMQ").hasMessageNotContaining("MIGRATION").hasMessageNotContaining("JWT_SECRET");
     }
 
     @Test
@@ -107,6 +110,65 @@ class ProductionConfigValidatorTest {
         assertThat(ProductionConfigValidator.problems((ten + ten + ten + "Z"), cors, "jdbc:postgresql://db/agendai")).anyMatch(p -> p.startsWith("JWT_SECRET: mínimo"));
         String nine = "Zx9!k2Lq#";
         assertThat(ProductionConfigValidator.problems((nine + nine + nine + nine), cors, "jdbc:postgresql://db/agendai")).anyMatch(p -> p.startsWith("JWT_SECRET: parece"));
+    }
+
+    private static MockEnvironment role(String... profiles) {
+        MockEnvironment env = new MockEnvironment();
+        env.setActiveProfiles(profiles);
+        return env;
+    }
+
+    @Test
+    @DisplayName("Worker: exige banco, RabbitMQ e SMTP; não o que é só da API (JWT, CORS, Redis, front) nem o dono das tabelas")
+    void workerRole() {
+        AgendaiProperties none = props(null, List.of(), false);   // sem JWT, CORS, cookie seguro: nada disso é do worker
+        new ProductionConfigValidator(role("prod", "worker"), none, "jdbc:postgresql://db:5432/agendai", "agendai_app", null,
+                null, "smtp.provedor.com", "agendai_worker", "r4bb1t-s3nha-al3atoria-01", null);
+        assertThatThrownBy(() -> new ProductionConfigValidator(role("prod", "worker"), none, "jdbc:h2:mem:x", "postgres", null,
+                null, " ", "", "curta", null))
+                .hasMessageContaining("DATABASE_URL").hasMessageContaining("DATABASE_USERNAME").hasMessageContaining("MAIL_HOST")
+                .hasMessageContaining("RABBITMQ_USERNAME").hasMessageContaining("RABBITMQ_PASSWORD")
+                .hasMessageNotContaining("JWT_SECRET").hasMessageNotContaining("CORS").hasMessageNotContaining("REDIS")
+                .hasMessageNotContaining("PUBLIC_URL").hasMessageNotContaining("SPRING_PROFILES_ACTIVE").hasMessageNotContaining("MIGRATION");
+        assertThatThrownBy(() -> new ProductionConfigValidator(role("prod", "worker"), none, "jdbc:postgresql://db:5432/agendai",
+                "agendai_app", null, null, "smtp.provedor.com", null, "r4bb1t-s3nha-al3atoria-01", null))
+                .hasMessageContaining("RABBITMQ_USERNAME").hasMessageNotContaining("RABBITMQ_PASSWORD");
+        for (String user : new String[]{null, " "}) {
+            assertThatThrownBy(() -> new ProductionConfigValidator(role("prod", "worker"), none, null, user, null,
+                    null, "smtp.provedor.com", "agendai_worker", null, null))
+                    .hasMessageContaining("DATABASE_URL").hasMessageContaining("DATABASE_USERNAME").hasMessageContaining("RABBITMQ_PASSWORD");
+        }
+    }
+
+    @Test
+    @DisplayName("Migrate: exige o banco e o dono das tabelas (diferente do usuário da aplicação); nada de HTTP, RabbitMQ ou SMTP")
+    void migrateRole() {
+        AgendaiProperties none = props(null, List.of(), false);
+        new ProductionConfigValidator(role("prod", "migrate"), none, "jdbc:postgresql://db:5432/agendai", "agendai_app", "agendai_owner",
+                null, null, null, null, null);
+        assertThatThrownBy(() -> new ProductionConfigValidator(role("prod", "migrate"), none, "jdbc:postgresql://db:5432/agendai",
+                "agendai_owner", "agendai_owner", null, null, null, null, null))
+                .hasMessageContaining("DATABASE_USERNAME").hasMessageNotContaining("MAIL_HOST").hasMessageNotContaining("RABBITMQ")
+                .hasMessageNotContaining("JWT_SECRET");
+        assertThatThrownBy(() -> new ProductionConfigValidator(role("prod", "migrate"), none, "jdbc:postgresql://db:5432/agendai",
+                "agendai_app", " ", null, null, null, null, null)).hasMessageContaining("DATABASE_MIGRATION_USERNAME");
+    }
+
+    @Test
+    @DisplayName("Sem papel, ou com mais de um: não sobe (e valida tudo, de todos os papéis)")
+    void roleRequired() {
+        for (MockEnvironment env : List.of(role("prod"), role("prod", "api", "worker"), role("prod", "worker", "migrate"),
+                role("prod", "api", "migrate"))) {
+            assertThatThrownBy(() -> new ProductionConfigValidator(env, props(GOOD_SECRET, List.of("https://agendai.app"), true),
+                    "jdbc:postgresql://db:5432/agendai", "agendai_app", "agendai_owner", "r3d1s-s3nha-al3atoria-0123", "smtp.provedor.com",
+                    "agendai_worker", "r4bb1t-s3nha-al3atoria-01", null))
+                    .as(String.join(",", env.getActiveProfiles()))
+                    .hasMessageContaining("SPRING_PROFILES_ACTIVE").hasMessageContaining("PUBLIC_URL");
+        }
+        assertThatThrownBy(() -> new ProductionConfigValidator(role("prod", "api", "worker"), props(null, List.of(), false),
+                "jdbc:postgresql://db:5432/agendai", "agendai_app", "agendai_owner", null, "smtp.provedor.com",
+                "agendai_worker", "r4bb1t-s3nha-al3atoria-01", "https://agendai.app"))
+                .as("com config de worker, o papel duplo ainda cobra o que é da API").hasMessageContaining("JWT_SECRET");
     }
 
     private static AgendaiProperties props(String secret, List<String> origins, boolean secureCookie) {

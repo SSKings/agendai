@@ -39,10 +39,24 @@ A coluna "Teste" aponta o teste que falha sem o controle (ou a fase em que o con
 | Segredo commitado | Varredura de segredos + proteção de push do GitHub; `.env*` no `.gitignore` | `.gitignore`; varredura de segredos e proteção de push: ativar nas configurações do GitHub |
 | Dados pessoais em log ou trace | Logs sem e-mail/telefone (mascarados), traces sem corpo de requisição | parcial: logs da fase 0 usam só ids (nunca e-mail); teste de log: fase 2 |
 
-## Eventos (fase 3a)
+## Eventos (fases 3a e 3b)
 
-- O RabbitMQ fica só na rede interna (`data`), com usuário e senha próprios (o validador de produção exige senha
-  aleatória de 16+ caracteres; o `guest` não existe). Filas *quorum* em disco.
+- O RabbitMQ fica só na rede interna (`data`). Filas *quorum* em disco.
+- Só o worker tem usuário no broker (3b1, `deploy/rabbitmq/init-users.sh`): `agendai_worker` declara, lê e publica
+  só em `agendai.*` e no exchange padrão (espera e fila de falhas). Pelo exchange padrão ele alcançaria qualquer fila
+  do vhost — hoje só existem as `agendai.*`; uma fila de outro sistema no mesmo vhost ficaria ao alcance dele. A API
+  não tem credencial do RabbitMQ (a autoconfiguração fica excluída no papel `api`). Senha aleatória de 16+
+  caracteres, só `[A-Za-z0-9._-]` (o script recusa; o validador de produção cobra o tamanho). Não existe administrador:
+  o script fala com o nó pelo cookie do Erlang (volume do broker, montado só leitura no container de init) e apaga
+  qualquer outro usuário (o `guest` da imagem, o administrador da 3a; o CI confere depois do upgrade). A senha vai
+  num arquivo do tmpfs do container de init, nunca na linha de comando. Para depurar, `rabbitmqctl` de dentro do
+  container do broker, não um usuário criado à mão (o próximo `up` o apaga).
+- Três processos, cada um com o que usa (3b1): o `migrate` é o único com a senha do dono das tabelas (roda e sai); a
+  API, exposta à internet, não tem a do dono nem a do RabbitMQ; o worker não tem porta da API (health na 8081, só no
+  localhost do container), não recebe o segredo do JWT (sem ele, sorteia uma chave: nenhum token vale ali; onde a API
+  roda, segredo ausente impede a partida), a senha do Redis nem a do dono, e sai para o SMTP por uma rede própria
+  (`egress`), fora do alcance do nginx. Produção exige exatamente um papel por processo; sem papel, ou com mais de um,
+  não sobe.
 - O conteúdo do aviso (e-mail do cliente, texto com o link pessoal) fica no `outbox_events` só até ser publicado: ao
   marcar como publicado, o `payload` vira nulo (`CHECK` garante). O `outbox_events` tem RLS por estabelecimento; o
   publicador lê por funções `SECURITY DEFINER` que só pegam e marcam.
@@ -55,13 +69,19 @@ A coluna "Teste" aponta o teste que falha sem o controle (ou a fase em que o con
   distribuição) só na rede `data`.
 - `processed_events` não tem `tenant_id` nem RLS, de propósito: guarda só o id do evento e a hora (nenhum dado de
   estabelecimento ou cliente).
-- Pendentes (3b): usuários separados para publicar e consumir (hoje o mesmo, com acesso a tudo no vhost); EXECUTE de
-  `outbox_claim`/`outbox_published` restrito ao papel da API (junto com o das V7/V9).
+- Pendente (antes da 3c): papel próprio do worker no banco, com EXECUTE só nas funções dele (`outbox_claim`,
+  `outbox_published`, V7, V9) — hoje a API e o worker usam o mesmo usuário, só de DML, e as funções têm EXECUTE público.
+- Risco aceito: a senha das definições vai do `rabbitmqctl` ao nó pela distribuição do Erlang, sem TLS, na rede
+  interna `data` — o mesmo nível do login AMQP dos serviços.
 - Testes: `OutboxIntegrationTest` (RabbitMQ fora → o aviso sai quando volta; duplicado → um e-mail; evento travado
   por outra instância → pulado, e o livre ao lado sai na hora; malformado → fila de falhas; fila de espera devolve;
   sem fila → não roteados), `OutboxRowLevelSecurityTest` (RLS; aviso desfeito com a transação; fora de transação,
   recusado), `EmailWorkerTest` (espera × fila de falhas), `ManageLinkIntegrationTest.noticeFailureKeepsResult`
-  (provedor fora por mais que uma tentativa) e a regra ArchUnit "RabbitMQ só pelo `notification`".
+  (provedor fora por mais que uma tentativa) e a regra ArchUnit "RabbitMQ só pelo `notification`". Na 3b1:
+  `RabbitPermissionsTest` (o script de produção num broker com o administrador da 3a: o que o worker pode e não pode,
+  troca de senha, usuário à mão apagado, senha fraca ou fora do alfabeto recusada), `RolesTest` (o que cada papel
+  sobe), `MigrateOnlyTest`, `ProductionConfigValidatorTest` (o que cada papel exige) e o E2E de produção (upgrade da
+  3a: o aviso sai pelo worker separado e só sobra o usuário do worker no broker).
 
 ## Riscos aceitos (revisão da fase 0)
 

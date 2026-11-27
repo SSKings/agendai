@@ -21,7 +21,7 @@ public class TestcontainersConfiguration {
     static final String REDIS_IMAGE =
             "redis:7.4-alpine@sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe";
     static final String REDIS_PASSWORD = "redis-test-password";
-    static final String RABBITMQ_IMAGE =
+    public static final String RABBITMQ_IMAGE =
             "rabbitmq:4.1-alpine@sha256:146b4c1ceed64aa5ac1931f5bf1aac1b10ad0ac8193773410e0c1d15050f8ec7";
     static final String RABBITMQ_PASSWORD = "rabbit-test-password";
     static final String MAILPIT_IMAGE =

@@ -55,4 +55,32 @@ class JwtServiceTest {
                 .withExpiresAt(clock.instant().plusSeconds(60)).sign(real))).isNull();
         assertThat(jwt.validate("abc")).isNull();
     }
+
+    static AgendaiProperties props(String secret) {
+        return new AgendaiProperties(new AgendaiProperties.Jwt(secret, 15), new AgendaiProperties.Refresh(30, true),
+                new AgendaiProperties.Login(5, 15), new AgendaiProperties.RateLimit(20, 120, 1200), 65536, new AgendaiProperties.Cors(List.of()));
+    }
+
+    @Test
+    @DisplayName("Onde a API roda, sem segredo não sobe (instâncias com chaves sorteadas recusariam os tokens umas das outras)")
+    void blankSecretRequired() {
+        for (String blank : new String[]{null, "", "  "}) {
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> new JwtService(props(blank), clock))
+                    .as(String.valueOf(blank)).isInstanceOf(IllegalStateException.class).hasMessageStartingWith("JWT_SECRET");
+        }
+        assertThat(new JwtService(props(SECRET), clock, false).validate(jwt.generate(new User("Ana", "ana@x.com", "hash", clock.instant()))))
+                .as("com segredo, não exigir não muda nada").isNotNull();
+    }
+
+    @Test
+    @DisplayName("Papel sem a API (worker, migrate): chave sorteada — token da API e o de outro processo não valem")
+    void blankSecretRandomKey() {
+        for (String blank : new String[]{null, "", "  "}) {
+            JwtService noSecret = new JwtService(props(blank), clock, false);
+            User u = new User("Ana", "ana@x.com", "hash", clock.instant());
+            assertThat(noSecret.validate(noSecret.generate(u))).as("o próprio processo ainda funciona").isNotNull();
+            assertThat(noSecret.validate(jwt.generate(u))).as("token da API (outro segredo): " + blank).isNull();
+            assertThat(new JwtService(props(blank), clock, false).validate(noSecret.generate(u))).as("cada processo sorteia a sua").isNull();
+        }
+    }
 }

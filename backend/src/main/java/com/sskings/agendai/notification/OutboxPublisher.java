@@ -4,6 +4,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageBuilder;
 import org.springframework.amqp.core.MessageDeliveryMode;
@@ -24,6 +25,7 @@ import java.util.UUID;
  * mesmo evento duas vezes (confirmou e a transação caiu antes do commit): o worker é idempotente pelo id.
  */
 @Slf4j
+@ConditionalOnBooleanProperty(name = "agendai.outbox.enabled", matchIfMissing = true)   // papel api
 @Component
 @RequiredArgsConstructor
 public class OutboxPublisher {
